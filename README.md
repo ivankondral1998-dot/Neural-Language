@@ -47,3 +47,7 @@ python3 -m unittest -q tests.test_hardening
 ## Экспериментальная ветка 0.4 — DAG
 
 В ветке `feature/graph-dag-0.4-20261108` реализовано параллельное ветвление нейросети, конкатенация выходов и нативное обучение с проверкой градиентов. См. [`language/docs/GRAPH_DAG_0_4_RU.md`](language/docs/GRAPH_DAG_0_4_RU.md). Это исследовательский прототип; основная `main` остаётся контрольной точкой 0.3.
+
+## Experimental engineering assistant 0.5
+
+The separate branch `feature/verified-assistant-0.5-20261108` contains a bounded, **non-LLM** Neural IR architecture proposal and verification loop. It compiles both `.nir` candidates with GCC/Clang, compares validation errors, verifies native predictions with an independent Python model reader, and publishes a candidate only if the stated acceptance policy passes. This is a research experiment, **not** autonomous self-improving AI or proof of novelty versus existing frameworks. See [`docs/ENGINEERING_BASELINE_0_5_RU.md`](docs/ENGINEERING_BASELINE_0_5_RU.md), [`docs/ASSISTANT_0_5_USAGE_RU.md`](docs/ASSISTANT_0_5_USAGE_RU.md) and [`RELEASE_STATUS_0_5_RU.md`](RELEASE_STATUS_0_5_RU.md). The `main` branch stays at the 0.3 baseline.

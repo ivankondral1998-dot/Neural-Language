@@ -8,3 +8,11 @@
 - `trained.nlw` is a trusted local text format NLMODEL2. Do not load untrusted files or claim atomic secure writes. Test corrupted/truncated model inputs and no-overwrite preservation.
 - To reproduce: `bash run.sh` then `python3 oracle_integration.py <result_dir>/trained.nlw`. Additional tests: `python3 -m unittest tests.test_integration` from language directory.
 - Any movement into UNO, deployment/physical phone tests or architecture change requires explicit project decision. All untested gaps must remain visible in report.
+
+## Experimental engineering assistant / 0.5 branch
+
+- Read `docs/ENGINEERING_BASELINE_0_5_RU.md` before ANY feature change. The owner's fixed objective is *language + assistant + evidence*, not isolated extra neural operators.
+- `language/assistant.py` is a constrained offline baseline experiment. It transforms verified Neural IR, recompiles real `.nir` sources, evaluates on disjoint train/validation/test samples, independently verifies forward with `language/reference_eval.py`, and publishes recommendation ONLY on explicit acceptance criteria.
+- Never call this an autonomous AI or claim novelty over PyTorch FX, MLIR or Optuna. The training model starts from scratch. No Android or RSS claims.
+- Use `python3 -m unittest tests.test_assistant -v` from `language/` and `bash run_assistant.sh` at repository root. Test `ACCEPT` and both REJECT outcomes, preservation, provenance, and independent oracle disagreement.
+- Do not run GitHub Actions; don't edit UNO or the protected `main` baseline.

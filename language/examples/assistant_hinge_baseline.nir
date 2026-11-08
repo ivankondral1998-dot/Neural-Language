@@ -1,0 +1,28 @@
+# A real nonlinear function. Straight linear regression cannot represent its kink.
+# Training coordinates MUST NOT be reused in the independent evaluation JSON.
+brain HingeDemo {
+  senses 2
+  neurons output 1 linear
+  init 37
+  budget 8192 128
+}
+cycle 900 {
+  observe [-1, -1]
+  learn [0] rate 0.04
+  observe [-1, 0]
+  learn [0] rate 0.04
+  observe [-1, 1]
+  learn [0] rate 0.04
+  observe [0, -1]
+  learn [1] rate 0.04
+  observe [0, 0]
+  learn [0] rate 0.04
+  observe [0, 1]
+  learn [0] rate 0.04
+  observe [1, -1]
+  learn [2] rate 0.04
+  observe [1, 0]
+  learn [1] rate 0.04
+  observe [1, 1]
+  learn [0] rate 0.04
+}
