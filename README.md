@@ -47,3 +47,7 @@ python3 -m unittest -q tests.test_hardening
 ## Текущая ревизия инженерного фундамента
 
 Отдельная ветка `audit/language-core-20261108` от `main` исправляет повторное объявление `init` и разграничивает собственно язык от побочных экспериментов. См. [`docs/FOUNDATION_CONTRACT_AND_AUDIT_20261108_RU.md`](docs/FOUNDATION_CONTRACT_AND_AUDIT_20261108_RU.md). Ветки 0.4/0.5 не слиты, основная `main` не изменена.
+
+## Neural IR — проверка эффектов (исследовательская ветка)
+
+В `fix/neural-ir-effects-20261108` добавлена **ограниченная** статическая проверка состояния ввода и уникальности/жизненного цикла снимков, а также машиночитаемая метаинформация `NeuralEffects/1` в Neural IR. Кодогенерация повторно сверяет этот контракт. См. [`docs/NEURAL_IR_EFFECTS_CONTRACT_RU.md`](docs/NEURAL_IR_EFFECTS_CONTRACT_RU.md) и [`docs/ENGINEERING_RESULT_20261108_RU.md`](docs/ENGINEERING_RESULT_20261108_RU.md). Это не полный типизированный IR и не новая оптимизация нейронов; существующий C++ runtime не менялся.

@@ -1,0 +1,56 @@
+{
+  "base_commit": "3b6c24b3f650ac3058bd50f1a12a3029a5e4b46a",
+  "compile_pipeline": "nir -> NeuralIR/0.2 + NeuralEffects/1 -> C++17 -> native",
+  "tested_on": "Linux host, not Android",
+  "test_groups": [
+    {
+      "group": "language+foundation",
+      "tests": 27,
+      "log": "logs/core_final.log",
+      "sha256": "f374b662eecaf397a0241caff61ad2984edb2c8f1c11dd73a92f8480f2bb5b16",
+      "status": "PASS"
+    },
+    {
+      "group": "integration",
+      "tests": 14,
+      "log": "logs/integration_retry.log",
+      "sha256": "6ac04a646b5d05319be4fcd0a7d2fa9ffc4c94f9f670ad1fed3575c36afd32b8",
+      "status": "PASS"
+    },
+    {
+      "group": "hardening",
+      "tests": 8,
+      "log": "logs/hardening_final.log",
+      "sha256": "1bdca194928cf92e9a8d8a57d2c0d4601698938251c5b1c7f24ae5175af7bbfd",
+      "status": "PASS"
+    },
+    {
+      "group": "quantization+verifier",
+      "tests": 10,
+      "log": "logs/numerics_final.log",
+      "sha256": "a647a60c2c16c87cb4df5d956d47f77b3499bf6de499896ad19aa1c304c2251c",
+      "status": "PASS"
+    },
+    {
+      "group": "static_effects",
+      "tests": 28,
+      "log": "logs/effects_final.log",
+      "sha256": "6ebb491134a6770c6a38cecea422a6732ca8c8790424110cc7207d4121da0c61",
+      "status": "PASS"
+    }
+  ],
+  "test_total": 87,
+  "source_sha256": {
+    "language/compiler.py": "b9010fa0d96edd957c1db40e27bb1201b3776b94454b00f37be71be09ea4ccb3",
+    "language/runtime/neural_runtime.hpp": "e3125bce3181f561982cae35488ed960ae5202cea6051534718014f3a90b3417",
+    "language/tests/test_language.py": "a2af03c8eeba9ee2129db360d246428c7e9b03be59f5059cb2ba3b145ba4eeb2",
+    "language/tests/test_state_effects.py": "1f7d22bcdae25f4500e7062856617d54924827fd78626d6852379079e0c3d2c5",
+    "language/tests/test_ir_contract.py": "2902d629b3d486ae617b56817fa2962d30acd0273962ad66b11bf4defc194c72",
+    "docs/NEURAL_IR_EFFECTS_CONTRACT_RU.md": "d1fc9fe5f0512965430691da202ba4423491dd873e9a2afab15edd4b5a4175d5",
+    "docs/ENGINEERING_RESULT_20261108_RU.md": "42c1e8d6d18d66ff398b4b83eb3431dc9403ebf5f68324b7a3aecfc3cbfc3b3e",
+    "AGENTS.md": "b57fa89a3e8204ecad6e92ffcb422bd58f499f3477008c704c7aa258c936f917",
+    "evidence/compat_7_examples_final.json": "b7df19f99666cdb75ec2a9f7d1c640eb651af4493624b1fe4b180647db5c56a4"
+  },
+  "compatibility_examples": 7,
+  "runtime_code_modified": false
+}

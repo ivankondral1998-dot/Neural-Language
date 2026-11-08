@@ -200,6 +200,6 @@ class PreservationTests(unittest.TestCase):
         self.assertTrue((self.td/'saved_1.json').exists())
     def test_checkpoint_duplicate_rejected(self):
         src='''brain Test {\n senses 1\n neurons result 1 linear\n init 5\n}\nremember start\nremember start'''
-        r=run_native(src,self.td,'dup_checkpoint')
-        self.assertNotEqual(r.returncode,0)
-        self.assertIn('checkpoint already exists',r.stderr)
+        # Guaranteed duplicate is now detected before code generation.
+        with self.assertRaisesRegex(CompileError, 'checkpoint already exists'):
+            parse(src)

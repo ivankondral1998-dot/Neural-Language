@@ -14,3 +14,10 @@
 - The baseline is `main` at `1bae50d72bffd1b0859bf75f85fceb523c02f676` (0.3). The 0.4 DAG and 0.5 assistant are independent unmerged experimental branches. Ten shared-weight workers are a separate experiment.
 - Read `docs/FOUNDATION_CONTRACT_AND_AUDIT_20261108_RU.md` before any language architecture work. The current audit branch fixes only duplicate `init`; do not merge sidecar research by default.
 - A code change needs a failing reproducible case, explicit semantics/criteria, independent check when mathematical behavior changes, and legacy regression tests. Keep the fixed owner goal separate from our proposed implementation choices.
+
+## Effects contract revision (2026-11-08, isolated branch)
+
+- Read `docs/NEURAL_IR_EFFECTS_CONTRACT_RU.md` before editing the `.nir` parser or Neural IR emission.
+- The `NeuralEffects/1` semantic contract is additive metadata: not a full IR type system, optimizer or runtime security guarantee.
+- Preserve C++ runtime checks; compiler-side rejection of invalid checkpoint usage does not replace runtime guards.
+- Do not merge unrelated 0.4 DAG, 0.5 assistant, ten-worker experiments or code from other user projects into the foundation without a separate technically justified change.

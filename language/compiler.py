@@ -204,48 +204,139 @@ def parse(text):
         return n
     steps=cost(program)
     if not program: raise CompileError("brain needs executable instructions")
-    validate_input_state(program)
-    return {'ir_version':'NeuralIR/0.2','brain':model,'operations':program,'estimated_max_operations':steps}
+    contract=validate_semantics(program)
+    return {'ir_version':'NeuralIR/0.2','brain':model,'operations':program,
+            'estimated_max_operations':steps,'semantic_contract':contract}
 
 
-def validate_input_state(program):
-    """Check the input-state precondition of native operations before code generation.
+# Conservative state/effect vocabulary for the operations supported by NeuralIR/0.2.
+# This metadata is an additive IR contract, NOT a proof that native execution
+# cannot fail (e.g. numeric overflow, filesystem failures or external inputs).
+# "writes" means "can change on success", not "must change".
+_EFFECTS = {
+    'observe':    ((), ('current_input', 'cache'), None),
+    'predict':    (('current_input', 'model_parameters'), ('cache', 'counters', 'stdout'), None),
+    'learn':      (('current_input', 'model_parameters'), ('model_parameters', 'cache', 'model_version', 'counters'), None),
+    'tune':       ((), ('runtime_mode',), None),
+    'weight':     (('model_parameters',), ('model_parameters', 'model_version', 'cache'), None),
+    'edge':       (('model_parameters',), ('model_parameters', 'model_version', 'cache'), None),
+    'remember':   (('current_input', 'model_parameters'), ('snapshots', 'stdout'), None),
+    'rewind':     (('snapshots',), ('current_input', 'model_parameters', 'model_version', 'cache', 'stdout'), None),
+    'inspect':    (('model_parameters',), ('stdout',), None),
+    'advise':     (('current_input', 'model_parameters'), ('cache', 'counters', 'event_log', 'stdout'), None),
+    'optimize':   (('current_input', 'model_parameters'), ('runtime_mode', 'cache', 'counters', 'event_log', 'stdout'), None),
+    'validate':   (('model_parameters',), ('event_log', 'stdout'), None),
+    'save_model': (('model_parameters',), ('stdout',), 'write'),
+    'load_model': ((), ('model_parameters', 'model_version', 'runtime_mode', 'cache', 'stdout'), 'read'),
+    'verify':     (('current_input', 'model_parameters'), ('event_log', 'stdout'), None),
+    'expect':     (('current_input', 'model_parameters'), ('cache', 'counters', 'stdout'), None),
+    'report':     (('model_parameters',), ('stdout',), 'write'),
+}
+_NEEDS_INPUT = frozenset({'predict', 'learn', 'expect', 'advise', 'verify', 'optimize'})
 
-    This pass reads normalized Neural IR operations; it neither executes them nor
-    changes the IR. Current .nir has only deterministic sequential statements and
-    positive-count cycles, so one pass through a loop body captures the required
-    input-state precondition. Runtime continues to validate model files, math and
-    dynamically missing checkpoint names.
 
-    State: "observed" means a current input exists in the native Model. A
-    checkpoint snapshots precisely that boolean alongside input and weights.
-    Read-only validate works on an isolated copy and must not produce an input.
-    Loading model weights does not change the current input state.
+def validate_semantics(program):
+    """Statically check deterministic snapshot/input lifetime and publish IR effects.
+
+    The language has no branches and cycles have positive, constant counts.
+    Checkpoints persist after rewind, are single-assignment, and are bounded to
+    64 per native Model.  A loop containing a checkpoint may execute only once.
+    A second abstract loop iteration is required: first iteration may remove
+    input and cause a precondition failure only on a subsequent iteration.
+    Since the input lattice is boolean and the body is deterministic, its
+    transfer function is identity or a constant and stabilizes after 1 pass.
     """
     snapshots = {}
-    needs_input = frozenset({'predict', 'learn', 'expect', 'advise',
-                             'verify', 'optimize'})
+    counts = {}
 
-    def walk(operations, observed):
+    def walk(operations, observed, multiplier=1):
         for operation in operations:
             kind = operation['op']
             if kind == 'cycle':
-                # The loop has at least one iteration by the parser contract.
-                observed = walk(operation['body'], observed)
-            elif kind == 'observe':
+                count = operation['count']
+                # Reject guaranteed duplicate snapshots before processing a loop.
+                observed = walk(operation['body'], observed, multiplier*count)
+                if count > 1:
+                    # Validate the second iteration's input preconditions.
+                    # Do not count it again; counts represent dynamic operations.
+                    observed = check_second_pass(operation['body'], observed)
+                continue
+            if kind not in _EFFECTS:
+                raise CompileError(f"unsupported IR operation {kind!r}")
+            counts[kind] = counts.get(kind, 0) + multiplier
+            if kind in _NEEDS_INPUT and not observed:
+                fail(operation['line'], f"{kind} requires observe before use (input state absent)")
+            if kind == 'observe':
                 observed = True
             elif kind == 'remember':
-                # Repeated checkpoints remain a runtime error (unchanged ABI).
-                snapshots.setdefault(operation['name'], observed)
+                if multiplier > 1:
+                    fail(operation['line'], 'checkpoint in repeating cycle would be created more than once')
+                label = operation['name']
+                if label in snapshots:
+                    fail(operation['line'], f"checkpoint already exists: {label}")
+                if len(snapshots) >= 64:
+                    fail(operation['line'], 'checkpoint limit exceeded (64)')
+                snapshots[label] = observed
             elif kind == 'rewind':
-                # Unknown labels remain runtime errors, but we must not assume
-                # that a failing restore makes an input available.
-                observed = snapshots.get(operation['name'], False)
-            elif kind in needs_input and not observed:
-                fail(operation['line'], f"{kind} requires observe before use (input state absent)")
+                label = operation['name']
+                if label not in snapshots:
+                    fail(operation['line'], f"unknown checkpoint: {label}")
+                observed = snapshots[label]
         return observed
 
-    walk(program, False)
+    def check_second_pass(operations, observed):
+        # No checkpoints can be defined inside a repeating cycle; walk the
+        # already-validated body's input transitions without mutating metadata.
+        for operation in operations:
+            kind = operation['op']
+            if kind == 'cycle':
+                observed = check_second_pass(operation['body'], observed)
+                # A nested positive-count cycle has the same boolean fixed point.
+            elif kind in _NEEDS_INPUT and not observed:
+                fail(operation['line'], f"{kind} requires observe before use (input state absent)")
+            elif kind == 'observe':
+                observed = True
+            elif kind == 'rewind':
+                observed = snapshots[operation['name']]
+        return observed
+
+    observed = walk(program, False)
+    return {
+        'version': 'NeuralEffects/1',
+        'initial_state': {'input_bound': False},
+        'final_state': {'input_bound': observed},
+        'snapshot_count': len(snapshots),
+        'checkpoints': {name: {'input_bound': state} for name, state in snapshots.items()},
+        'operation_counts': dict(sorted(counts.items())),
+        'effects': {
+            kind: {'requires': ['current_input'] if kind in _NEEDS_INPUT else [],
+                   'reads': list(_EFFECTS[kind][0]),
+                   'writes': list(_EFFECTS[kind][1]),
+                   'filesystem': _EFFECTS[kind][2]}
+            for kind in sorted(counts)
+        },
+        'scope': 'static success-path model; runtime checks remain mandatory',
+    }
+
+
+def validate_input_state(program):
+    """Compatibility wrapper for callers of the earlier precondition checker."""
+    return validate_semantics(program)
+
+
+def verify_semantic_contract(ir):
+    """Verify effect facts against actual operations before native code emission.
+
+    This is intentionally limited to state, snapshot lifetime and effect
+    metadata; it is not a general verifier of all Neural IR shapes/types.
+    Older IR dictionaries without metadata remain accepted but are checked.
+    """
+    contract = validate_semantics(ir['operations'])
+    declared = ir.get('semantic_contract')
+    if declared is not None and declared != contract:
+        raise CompileError('Neural IR semantic contract mismatch')
+    return contract
+
 
 def analyze_ir(ir):
     """Deterministic compiler-side developer assistant; no external model."""
@@ -297,6 +388,7 @@ def string(s):
     return json.dumps(s,ensure_ascii=False)
 
 def emit(ir):
+    verify_semantic_contract(ir)
     b=ir['brain']; lines=['#include "neural_runtime.hpp"','#include <exception>', 'int main() {','try {',f'neural::Model brain({string(b["name"])},{b["senses"]});']
     for k,l in enumerate(b['neurons']):
         typ={'linear':0,'relu':1,'sigmoid':2}[l['activation']]

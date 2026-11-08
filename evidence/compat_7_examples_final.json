@@ -1,0 +1,49 @@
+{
+  "count": 7,
+  "all_ir_existing_fields_identical": true,
+  "generated_cpp_identical": true,
+  "examples": [
+    {
+      "source": "inference.nir",
+      "ir_without_semantics_sha256": "31a8f45aa42feafe548414d70cb8fac6922b9464c9f86891b7cf0e305cbd9383",
+      "cpp_sha256": "daca90366ddd4930a91d098ab6dc4d0fe3333c241f1169db14d2b41c3cd8d781",
+      "checked_contract_version": "NeuralEffects/1"
+    },
+    {
+      "source": "integrated.nir",
+      "ir_without_semantics_sha256": "ddd3ab152e7d6687415367c712cd16b0021ed8c48525c18a7c1ffcf60b77c768",
+      "cpp_sha256": "fc3e3f055f33124e8ae2592c5ce7dd8a9508e91450bd1b5d18e60f9a2509275b",
+      "checked_contract_version": "NeuralEffects/1"
+    },
+    {
+      "source": "learning.nir",
+      "ir_without_semantics_sha256": "c4c9f736cd634277bd204d2580baaf0cf72000f1937f14e06f0a171b3576119a",
+      "cpp_sha256": "13fddbdd25a375862436ea784a39b26d280c896a22838877eca730937c73f76b",
+      "checked_contract_version": "NeuralEffects/1"
+    },
+    {
+      "source": "minimal.nir",
+      "ir_without_semantics_sha256": "3cb03b597608bac61175af5574932d6184564e957fd7052bc0d2ea1fe4de8c13",
+      "cpp_sha256": "b06ae3bd2706f797bf8f760574c4f99f4b967277beeafb132503eb917da01da4",
+      "checked_contract_version": "NeuralEffects/1"
+    },
+    {
+      "source": "optimization_profile.nir",
+      "ir_without_semantics_sha256": "625d2564a584473231cacb5b43f22d2bec8a78a4843af70b037ce9df3c1b0beb",
+      "cpp_sha256": "5dfcf57100720cbe579031f7e39f1cdb4cfeee5e10aefa48808107afa2486071",
+      "checked_contract_version": "NeuralEffects/1"
+    },
+    {
+      "source": "performance.nir",
+      "ir_without_semantics_sha256": "9c76d995dcbbd465c395d7b90d15427d1a0c1dfe7f942231ae20f0af3dd3a73d",
+      "cpp_sha256": "05b55babb03a17b429931abe91e0cc7cc17be6bc39e4afa301b395ac3d87d96c",
+      "checked_contract_version": "NeuralEffects/1"
+    },
+    {
+      "source": "self_check.nir",
+      "ir_without_semantics_sha256": "a142c993ea582f3d31ab1acb4f3edd3aae9a313f3696cafd735f6c85bc35e6b0",
+      "cpp_sha256": "c647a62891c5d1da7f775df0c189db5526d96544b98d0c4dcca11d12e5520897",
+      "checked_contract_version": "NeuralEffects/1"
+    }
+  ]
+}
