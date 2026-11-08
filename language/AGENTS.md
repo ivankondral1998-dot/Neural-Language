@@ -14,3 +14,7 @@ For each substantial change: identify the language-level barrier, source/IR cont
 - Separate compiler, IR, native runtime, DSL program, optional developer assistant. Keep execution deterministic and no implicit network/API dependency.
 - The built-in advisor is heuristic and does not constitute a trained model or a self-improving intelligence. Always validate the outputs against full computation and held-out workloads before claiming a performance win.
 - Test both GCC and Clang, error/shape handling and numerics. Only report tests actually run.
+
+## NL-COMP-005 (typed changes/effects; isolated feature branch)
+
+Before modifying the active Neural IR compiler, read `../docs/NEURAL_SHAPES_EFFECTS_CHANGES_20261108_RU.md` and run `python3 -m unittest -q tests.test_shapes_changes_integration` from `language/`. The compiler now cross-checks `NeuralShapes/1`, `NeuralEffects/1`, and `NeuralChanges/1` before C++ emission. Preserve the nine frozen native-output SHA-256 values and runtime semantics. This is strictly sequential dense inference/training, NOT typed DAG, ARM64 measurements, or general tensor infrastructure. Do not merge experimental DAG/mobile branches without separate tests and owner-approved architecture decisions.
