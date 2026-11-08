@@ -1,6 +1,9 @@
 // Neural Language: lightweight native inference for trusted NLMODEL2 checkpoints.
 // C++17; no Python, BLAS, training state, networking, or third-party dependencies.
 #include <algorithm>
+#include <array>
+#include <limits>
+#include <cstring>
 #include <cmath>
 #include <cstdint>
 #include <fstream>
@@ -23,6 +26,8 @@ struct Layer {
     std::vector<int8_t> compact;
     std::vector<uint8_t> gates;
 };
+struct Model;
+Model load_binary_checkpoint(const std::string&,std::size_t);
 struct Model {
     int input_size=0;
     std::vector<Layer> layers;
@@ -30,8 +35,14 @@ struct Model {
 
     static Model load(const std::string& path, std::size_t max_bytes=256u*1024u*1024u) {
         // Files are expected to be locally generated and trusted; this is not a sandbox.
-        std::ifstream in(path);
+        std::ifstream in(path,std::ios::binary);
         check(bool(in), "cannot open checkpoint");
+        char prefix[8]{};
+        in.read(prefix,8);
+        if(in.gcount()==8 && std::memcmp(prefix,"NLMOBIN1",8)==0)
+            return load_binary_checkpoint(path,max_bytes);
+        in.clear();
+        in.seekg(0,std::ios::beg);
         std::string magic;
         int inputs=0, count=0, mode=0;
         check(bool(in>>magic>>inputs>>count>>mode), "truncated checkpoint header");
@@ -119,6 +130,8 @@ struct Model {
         return current;
     }
 };
+
+#include "mobile_binary.hpp"
 
 std::vector<double> parse_csv(const std::string& source){
     check(!source.empty(), "missing input numbers");
