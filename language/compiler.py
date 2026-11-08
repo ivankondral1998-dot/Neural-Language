@@ -230,6 +230,7 @@ def parse(text):
             'semantic':'input[index] += delta, then mathematically full forward at next use; '
                        'incremental evaluation allowed within numerical tolerance'
         }
+    result['shape_contract']=verify_typed_ir(result)
     verify_neural_changes(result)
     return result
 
@@ -314,6 +315,8 @@ def validate_semantics(program):
                 snapshots[label]=observed
             elif kind=='rewind':
                 label=op.get('name')
+                if type(label) is not str:
+                    raise CompileError('NeuralEffects: checkpoint name invalid')
                 if label not in snapshots:fail(op['line'],f'unknown checkpoint: {label}')
                 observed=snapshots[label]
         return observed
@@ -346,12 +349,195 @@ def verify_semantic_contract(ir):
     return contract
 
 
+def verify_typed_ir(ir):
+    """Validate NeuralIR/0.2 dense types/shapes before emitting native code.
+
+    Ported from the project's existing NeuralShapes/1 research contract, with
+    a typed scalar input index and finite delta for observe_delta. This is
+    intentionally NOT a general DAG or tensor type system.
+    """
+    def require(condition, reason):
+        if not condition:
+            raise CompileError('Neural IR type/shape: ' + reason)
+
+    def uint(value, lo, hi, label):
+        require(type(value) is int and lo <= value <= hi, label + ' must be integer within bounds')
+        return value
+
+    def real(value, label, lo=None, hi=None):
+        require(type(value) in (int, float) and math.isfinite(value) and abs(value) < 1e9,
+                label + ' invalid numeric value')
+        if lo is not None: require(value >= lo, label + ' below valid range')
+        if hi is not None: require(value <= hi, label + ' above valid range')
+        return value
+
+    def vec(values, expected, label):
+        require(type(values) is list and len(values) == expected,
+                f'{label} vector shape mismatch (expected [{expected}])')
+        for index, v in enumerate(values):
+            real(v, f'{label} numeric component {index}')
+
+    def identifier(value, label):
+        require(type(value) is str and IDENT.fullmatch(value) is not None,
+                label + ' invalid identifier')
+        return value
+
+    def filename(value, label):
+        require(type(value) is str and value and value not in ('.','..') and
+                '/' not in value and chr(92) not in value and '..' not in value,
+                label + ' invalid filename')
+        try: encoded=value.encode('utf-8')
+        except UnicodeError: raise CompileError('Neural IR type/shape: ' + label + ' invalid filename Unicode')
+        require(len(encoded) <= 80 and not any(
+            unicodedata.category(c).startswith('C') or
+            unicodedata.category(c) in ('Zl','Zp') for c in value),
+            label + ' invalid filename characters')
+
+    require(type(ir) is dict and ir.get('ir_version') == 'NeuralIR/0.2',
+            'unsupported IR version (expected NeuralIR/0.2)')
+    brain=ir.get('brain')
+    require(type(brain) is dict, 'brain must be an object')
+    identifier(brain.get('name'), 'brain name')
+    senses=uint(brain.get('senses'),1,2048,'senses')
+    uint(brain.get('init'),0,4294967295,'init')
+    layers=brain.get('neurons')
+    require(type(layers) is list and 1 <= len(layers) <= 8,
+            'neurons must contain 1..8 sequential layers')
+    shapes={};declarations=[];prev=senses;total=0;weight_bytes=0;storage_bytes=8*senses
+    for index,layer in enumerate(layers):
+        require(type(layer) is dict, f'layer {index} must be an object')
+        name=identifier(layer.get('name'), f'layer {index} name')
+        require(name not in shapes, f'duplicate neuron layer: {name}')
+        size=uint(layer.get('size'),1,4096,f'layer {index} size')
+        activation=layer.get('activation')
+        require(type(activation) is str and activation in ('linear','relu','sigmoid'),
+                f'layer {index} invalid activation')
+        storage=layer.get('storage','float')
+        require(type(storage) is str and storage in ('float','int8'),
+                f'layer {index} invalid storage')
+        shapes[name]=(size,prev)
+        total+=prev*size
+        width=1 if storage=='int8' else 8
+        weight_bytes+=prev*size*width
+        storage_bytes+=prev*size*(width+1)+size*(8+16)
+        declarations.append({
+            'name':name,
+            'input':{'dtype':'f64','shape':[prev]},
+            'output':{'dtype':'f64','shape':[size]},
+            'weight_shape':[size,prev],
+            'weight_storage':storage,
+        })
+        prev=size
+    require(total <= 4000000,'model exceeds maximum weights')
+    for label,actual,calculated in (
+        ('weights',brain.get('weights'),total),
+        ('macs',brain.get('macs'),total),
+        ('weight_bytes',brain.get('weight_bytes'),weight_bytes),
+        ('storage_bytes',brain.get('storage_bytes'),storage_bytes),
+    ):
+        require(type(actual) is int and actual == calculated,
+                f'{label} inconsistent with declared tensor shapes')
+    require(brain.get('budget_scope') == 'resident numeric tensors and forward MACs only',
+            'budget_scope mismatch')
+    budget=brain.get('budget')
+    if budget is not None:
+        require(type(budget) in (tuple,list) and len(budget)==2,
+                'budget must be two positive bounds')
+        resident_bound=uint(budget[0],1,1 << 30,'budget resident bytes')
+        mac_bound=uint(budget[1],1,1 << 30,'budget forward MACs')
+        require(storage_bytes <= resident_bound and total <= mac_bound,
+                'budget exceeded for declared model')
+
+    operations=ir.get('operations')
+    require(type(operations) is list and operations, 'operations must be a non-empty list')
+    signatures={}
+    def check_ops(ops,depth=0):
+        require(type(ops) is list,'cycle body must be an array of operations')
+        require(depth <= 8, 'cycle nesting limit exceeded')
+        cost=0
+        for op in ops:
+            require(type(op) is dict,'operation must be an object')
+            kind=op.get('op')
+            require(type(kind) is str and (kind in _EFFECTS or kind=='cycle'),
+                    'unsupported IR operation')
+            uint(op.get('line'),1,5000,f'{kind} line')
+            if kind=='cycle':
+                count=uint(op.get('count'),1,100000,'cycle count')
+                body=op.get('body')
+                require(type(body) is list,'cycle body must be an array of operations')
+                cost+=check_ops(body,depth+1)*count
+            else:
+                cost+=1
+                if kind=='observe':
+                    vec(op.get('values'),senses,'observe')
+                    signatures[kind]={'values':{'dtype':'f64','shape':[senses]}}
+                elif kind=='observe_delta':
+                    uint(op.get('index'),0,senses-1,'observe_delta index')
+                    real(op.get('delta'),'observe_delta delta')
+                    signatures[kind]={'index':'input_index','delta':'f64'}
+                elif kind=='learn':
+                    vec(op.get('values'),prev,'learn')
+                    real(op.get('rate'),'learn rate',0,1)
+                    require(op['rate']>0,'learn rate must be positive')
+                    signatures[kind]={'values':{'dtype':'f64','shape':[prev]},'rate':'f64'}
+                elif kind=='expect':
+                    vec(op.get('values'),prev,'expect')
+                    real(op.get('tolerance'),'expect tolerance',0)
+                    signatures[kind]={'values':{'dtype':'f64','shape':[prev]},'tolerance':'f64'}
+                elif kind=='validate':
+                    vec(op.get('input'),senses,'validate input')
+                    vec(op.get('target'),prev,'validate target')
+                    real(op.get('tolerance'),'validate tolerance',0)
+                    signatures[kind]={
+                        'input':{'dtype':'f64','shape':[senses]},
+                        'target':{'dtype':'f64','shape':[prev]},
+                        'tolerance':'f64',
+                    }
+                elif kind in ('weight','edge'):
+                    layer=op.get('layer')
+                    require(type(layer) is str and layer in shapes, f'{kind} invalid layer')
+                    rows,columns=shapes[layer]
+                    require(type(op.get('row')) is int and 0 <= op['row'] < rows and
+                            type(op.get('col')) is int and 0 <= op['col'] < columns,
+                            f'{kind} index outside tensor shape')
+                    if kind=='weight':real(op.get('delta'),'weight delta')
+                    else:require(type(op.get('enabled')) is bool,'edge enabled must be boolean')
+                    signatures[kind]={'layer':'dense_layer','row':'index','col':'index'}
+                elif kind=='tune':
+                    require(type(op.get('mode')) is str and op['mode'] in ('auto','full','incremental'),
+                            'tune invalid mode')
+                elif kind=='advise':uint(op.get('rounds'),10,100000,'advise rounds')
+                elif kind=='verify':uint(op.get('rounds'),2,2000,'verify rounds')
+                elif kind=='optimize':uint(op.get('rounds'),20,2000,'optimize rounds')
+                elif kind in ('remember','rewind'):identifier(op.get('name'),kind+' checkpoint')
+                elif kind in ('save_model','load_model','report'):filename(op.get('filename'),kind)
+                # predict and inspect carry no operands
+            require(cost <= 1000000,'program exceeds one million operations')
+        return cost
+    total_ops=check_ops(operations)
+    require(type(ir.get('estimated_max_operations')) is int and
+            ir['estimated_max_operations']==total_ops,
+            'estimated_max_operations inconsistent with operations')
+    shape_contract={
+        'version':'NeuralShapes/1',
+        'input':{'dtype':'f64','shape':[senses]},
+        'output':{'dtype':'f64','shape':[prev]},
+        'layers':declarations,
+        'operation_signatures':{k:signatures[k] for k in sorted(signatures)},
+        'scope':'sequential dense layers; rank-1 f64 input/output; no general tensor or DAG support',
+    }
+    if 'shape_contract' in ir:
+        require(ir['shape_contract']==shape_contract,'shape contract mismatch')
+    return shape_contract
+
+
 def verify_neural_changes(ir):
     """Validate the additive NeuralChanges/1 contract before analysis or codegen.
 
     This is deliberately narrow; it is not a general-purpose typed DAG verifier.
     """
     verify_semantic_contract(ir)
+    verify_typed_ir(ir)
     brain=ir.get('brain')
     if not isinstance(brain,dict):raise CompileError('NeuralChanges: missing brain')
     senses=brain.get('senses')
