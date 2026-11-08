@@ -1,0 +1,14 @@
+# Standalone native inference program, no training. Loads .nir-trained weights.
+brain IntegratedLinear {
+ senses 2
+ neurons answer 1 linear
+ init 999
+ budget 65536 64
+}
+load_model "trained.nlw"
+validate [0.25, 0.75] target [0.3] tolerance 0.02
+validate [0.75, 0.35] target [0.52] tolerance 0.02
+observe [0.25, 0.75]
+predict
+inspect
+report "inference_result.json"
