@@ -1,0 +1,44 @@
+{
+  "experiment": "NL-COMP-001B",
+  "timestamp_utc": "2026-11-08T17:30:06Z",
+  "source_blobs": {
+    "language/runtime/neural_runtime.hpp": "ee71cdab32b248814aa23f26318130bd155c824f"
+  },
+  "sources_sha256": {
+    "runtime_compare.cpp": "564941c01d29b46658964436c2e781e5533f8184e4245c7f0bbc623124047b7d",
+    "change_aware_001.cpp": "c0da5fc03b2b5f6eae75c27a9883e2202414e09f155a8a4f843847771fc590e2"
+  },
+  "compiler_version": "g++ (Debian 14.2.0-19) 14.2.0",
+  "compile_command": [
+    "g++",
+    "-std=c++17",
+    "-O3",
+    "-march=native",
+    "-fno-fast-math",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-DNEURAL_RUNTIME_SCIPY_BLAS",
+    "-DSCIPY_BLAS",
+    "-I",
+    "/mnt/data/neural_change_lab/baseline_03",
+    "/mnt/data/neural_change_lab/runtime_compare.cpp",
+    "/opt/pyvenv/lib/python3.13/site-packages/scipy.libs/libscipy_openblas-6cdc3b4a.so",
+    "/opt/pyvenv/lib/python3.13/site-packages/numpy.libs/libscipy_openblas64_-fdde5778.so",
+    "-Wl,-rpath,/opt/pyvenv/lib/python3.13/site-packages/scipy.libs",
+    "-Wl,-rpath,/opt/pyvenv/lib/python3.13/site-packages/numpy.libs",
+    "-o",
+    "/mnt/data/neural_change_lab/runtime_gcc/runtime_compare"
+  ],
+  "OpenBLAS_LP64": "/opt/pyvenv/lib/python3.13/site-packages/scipy.libs/libscipy_openblas-6cdc3b4a.so",
+  "OpenBLAS_ILP64": "/opt/pyvenv/lib/python3.13/site-packages/numpy.libs/libscipy_openblas64_-fdde5778.so",
+  "thread_count": 1,
+  "cpu": "model name\t: AMD EPYC 9V74 80-Core Processor",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "reps": 5,
+  "steps": 250,
+  "warmup": 32,
+  "quick": false,
+  "criteria": "runtime_AUTO median <= .8*runtime_FULL, paired repeats >=4/5; relerr <=1e-9",
+  "limitations": "Linux CPU; direct runtime 0.3 source; JNI/Android not tested."
+}
