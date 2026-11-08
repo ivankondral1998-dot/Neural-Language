@@ -171,9 +171,12 @@ expect [0] tolerance 1e-12
         src=PREAMBLE+'predict'
         p=self.td/'orig.nir';p.write_text(src)
         old=p.read_bytes()
-        r=run_native(src,self.td,'runtimefail')
-        self.assertNotEqual(r.returncode,0)
-        self.assertIn('observe',r.stderr)
+        # Input liveness is now checked before C++ generation; preserve the
+        # original source and reject a guaranteed runtime failure earlier.
+        compiled=subprocess.run([sys.executable,str(ROOT/'compiler.py'),str(p),
+            '-o',str(self.td/'runtimefail')],capture_output=True,text=True)
+        self.assertNotEqual(compiled.returncode,0)
+        self.assertIn('predict requires observe',compiled.stderr)
         self.assertEqual(p.read_bytes(),old)
 
 if __name__=='__main__':unittest.main(verbosity=2)
@@ -196,6 +199,5 @@ class PreservationTests(unittest.TestCase):
         self.assertTrue((self.td/'saved_1.json').exists())
     def test_checkpoint_duplicate_rejected(self):
         src='''brain Test {\n senses 1\n neurons result 1 linear\n init 5\n}\nremember start\nremember start'''
-        r=run_native(src,self.td,'dup_checkpoint')
-        self.assertNotEqual(r.returncode,0)
-        self.assertIn('checkpoint already exists',r.stderr)
+        with self.assertRaisesRegex(CompileError,'checkpoint already exists'):
+            parse(src)  # NeuralEffects rejects duplicate labels before native code
