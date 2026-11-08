@@ -1,0 +1,15 @@
+# Graph inference in a separate native executable, without training.
+brain BranchingDemo {
+  senses 2
+  neurons left 2 linear from input
+  neurons right 2 linear from input
+  neurons combined 1 linear from left right
+  init 999
+  budget 65536 64
+}
+load_model "graph_trained.nlw"
+validate [0.25, 0.75] target [0.475] tolerance 0.02
+validate [0.75, 0.35] target [0.56] tolerance 0.02
+observe [0.25, 0.75]
+predict
+report "graph_infer_report.json"

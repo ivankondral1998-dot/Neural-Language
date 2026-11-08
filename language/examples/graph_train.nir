@@ -1,0 +1,25 @@
+# Parallel branches left/right, merged by concatenation. Offline native SGD.
+brain BranchingDemo {
+  senses 2
+  neurons left 2 linear from input
+  neurons right 2 linear from input
+  neurons combined 1 linear from left right
+  init 17
+  budget 65536 64
+}
+cycle 500 {
+  observe [0, 0]
+  learn [0.1] rate 0.08
+  observe [1, 0]
+  learn [0.55] rate 0.08
+  observe [0, 1]
+  learn [0.45] rate 0.08
+  observe [1, 1]
+  learn [0.9] rate 0.08
+}
+validate [0.25, 0.75] target [0.475] tolerance 0.02
+validate [0.75, 0.35] target [0.56] tolerance 0.02
+observe [0.25, 0.75]
+predict
+save_model "graph_trained.nlw"
+report "graph_train_report.json"

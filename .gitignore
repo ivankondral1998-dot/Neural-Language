@@ -24,3 +24,4 @@ runs/
 !.env.example
 *.key
 *.pem
+runs_graph/

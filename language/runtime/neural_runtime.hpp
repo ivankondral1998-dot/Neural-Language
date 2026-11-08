@@ -1,5 +1,5 @@
 #pragma once
-// Neural Language 0.2 adaptive native runtime, C++17. No Python interpreter in execution path.
+// Neural Language 0.4 adaptive native runtime (sequential + DAG), C++17. No Python interpreter in execution path.
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -53,7 +53,7 @@ inline std::string escape(const std::string& s) { std::string out; for (unsigned
 inline double act(double z,int type) { if(type==1) return std::max(0.0,z); if(type==2) return z>=0?1.0/(1.0+std::exp(-z)):std::exp(z)/(1.0+std::exp(z)); return z; }
 inline double derivative(double z,double a,int type) {if(type==1)return z>0?1.0:0.0;if(type==2)return a*(1-a);return 1.0;}
 struct Layer {
-  std::string name; int in=0,out=0,type=0,storage=0; std::vector<double> w,b;std::vector<int8_t> q; double scale=1.0/127.0;std::vector<uint8_t> enabled;size_t disabled=0;
+  std::string name; int in=0,out=0,type=0,storage=0; std::vector<double> w,b;std::vector<int8_t> q; double scale=1.0/127.0;std::vector<uint8_t> enabled;size_t disabled=0;std::vector<int> sources;
   // Exactly one owning weight buffer: either q (one byte/weight) or w (eight bytes/weight).
   size_t weight_count() const { return storage ? q.size() : w.size(); }
   double raw(size_t i) const { return storage ? double(q[i])*scale : w[i]; }
@@ -80,20 +80,55 @@ public:
   std::vector<Pending> pending;
   int pending_layer=-1;
   size_t delta_streak=0;
+  bool graph=false; // DAGs deliberately use full recomputation until graph delta is validated.
   enum Mode {AUTO=0,FULL=1,DELTA=2};Mode mode=AUTO;
   std::vector<std::string> events;
   explicit Model(std::string n,int ni):name(std::move(n)),ninput(ni) {require(ni>0&&ni<=2048,"input dimension out of range");}
+  // Backward-compatible sequential declaration. A DAG layer names its parents
+  // explicitly; each parent's output is concatenated in source order.
   void layer(std::string nm,int out,int type,uint32_t seed,int storage=0) {
+    const std::string prev=layers.empty()?"input":layers.back().name;
+    layer_sources(std::move(nm),out,type,seed,storage,{prev});
+  }
+  void layer_sources(std::string nm,int out,int type,uint32_t seed,int storage,
+                     const std::vector<std::string>& parents) {
     require(out>0&&out<=4096,"layer dimension out of range");require(layers.size()<8,"too many layers");
     require(storage==0||storage==1,"storage must be float or int8");
-    int in=layers.empty()?ninput:layers.back().out;
+    require(type>=0&&type<=2,"activation invalid");
+    require(!nm.empty()&&nm!="input","layer name reserved or empty");
+    for(const auto& l:layers) require(l.name!=nm,"duplicate layer name");
+    require(!parents.empty()&&parents.size()<=8,"invalid parent count");
+    std::vector<int> indices;
+    int in=0;
+    for(const auto& parent:parents) {
+      int index=-2;
+      if(parent=="input")index=-1;
+      else for(size_t i=0;i<layers.size();i++)if(layers[i].name==parent) {index=int(i);break;}
+      require(index!=-2,"unknown or forward graph parent");
+      require(std::find(indices.begin(),indices.end(),index)==indices.end(),"duplicate graph parent");
+      indices.push_back(index);
+      in += index==-1 ? ninput : layers[static_cast<size_t>(index)].out;
+    }
+    const int sequential=layers.empty()?-1:int(layers.size()-1);
+    if(indices.size()!=1 || indices[0]!=sequential)graph=true;
     size_t total=static_cast<size_t>(in)*out;require(total<=4000000,"weight budget exceeded");
-    Layer l;l.name=std::move(nm);l.in=in;l.out=out;l.type=type;l.storage=storage;
+    Layer l;l.name=std::move(nm);l.in=in;l.out=out;l.type=type;l.storage=storage;l.sources=std::move(indices);
     if(l.storage)l.q.resize(total);else l.w.resize(total);l.enabled.assign(total,1);l.b.assign(out,0);
     std::mt19937 rng(seed);std::uniform_real_distribution<double> dis(-0.35,0.35);
     for(size_t i=0;i<total;i++)l.assign_weight(i,dis(rng));
-    layers.push_back(std::move(l));
-    z.resize(layers.size());a.resize(layers.size());
+    layers.push_back(std::move(l));z.resize(layers.size());a.resize(layers.size());
+  }
+  // Non-owning reference for the common sequential case; gather otherwise.
+  const std::vector<double>& layer_input(size_t k,std::vector<double>& joined)const {
+    const Layer& l=layers[k];
+    if(l.sources.size()==1){const int parent=l.sources[0];return parent==-1?input:a[static_cast<size_t>(parent)];}
+    joined.clear();joined.reserve(static_cast<size_t>(l.in));
+    for(int parent:l.sources){
+      const auto& source=parent==-1?input:a[static_cast<size_t>(parent)];
+      joined.insert(joined.end(),source.begin(),source.end());
+    }
+    require(joined.size()==static_cast<size_t>(l.in),"gathered graph input has invalid size");
+    return joined;
   }
   void observe(std::vector<double> x){require((int)x.size()==ninput,"input shape mismatch");for(double v:x)finite(v,"input");if(!has_input||x!=input) {cache=false;pending.clear();pending_layer=-1;delta_streak=0;} input=std::move(x);has_input=true;}
   // All full passes use the same FP64 weights, activation semantics and mask.
@@ -101,7 +136,7 @@ public:
   void forward() {
     require(has_input,"observe an input before inference");
     for(size_t k=0;k<layers.size();k++) {
-      const auto& l=layers[k];const auto& prev=k?a[k-1]:input;
+      const auto& l=layers[k];std::vector<double> joined;const auto& prev=layer_input(k,joined);
       if((int)z[k].size()!=l.out){z[k].assign(l.out,0);a[k].assign(l.out,0);} else {std::fill(z[k].begin(),z[k].end(),0.0);std::fill(a[k].begin(),a[k].end(),0.0);}
       const bool blas = has_blas && l.storage==0 && l.disabled==0 && l.w.size()>=256;
       if(blas) {
@@ -134,7 +169,7 @@ public:
     return cost;
   }
   bool choose_delta()const {
-    if(mode==FULL||!cache||pending.empty()||pending_layer<0)return false;
+    if(graph||mode==FULL||!cache||pending.empty()||pending_layer<0)return false;
     if(delta_streak>=128)return false; // Bound long-term floating point drift.
     if(mode==DELTA)return true;
     if(full_cost()<1024)return false;
@@ -217,21 +252,37 @@ public:
     require(!layers.empty(),"empty network");require(has_input,"observe before learn");require((int)target.size()==layers.back().out,"target shape mismatch");
     require(rate>0&&rate<=1,"learning rate out of range");for(double v:target)finite(v,"target");
     infer(false);
-    std::vector<std::vector<double>> grad(layers.size());
-    size_t last=layers.size()-1;
-    grad[last].resize(layers[last].out);
-    for(int i=0;i<layers[last].out;i++)grad[last][i]=2.0*(a[last][i]-target[i])/layers[last].out*derivative(z[last][i],a[last][i],layers[last].type);
-    for(int k=int(last)-1;k>=0;k--){
-      grad[k].assign(layers[k].out,0);
-      const Layer& next=layers[k+1];
-      for(int j=0;j<layers[k].out;j++){
-        double v=0;for(int r=0;r<next.out;r++)v+=next.effective(static_cast<size_t>(r)*next.in+j)*grad[k+1][r];
-        grad[k][j]=v*derivative(z[k][j],a[k][j],layers[k].type);
+    // Reverse-mode differentiation on a topologically ordered DAG. Each
+    // neuron's adjoint accumulates ALL downstream consumers (fan-out). Parent
+    // slices refer to the concatenation ordering declared in the language.
+    std::vector<std::vector<double>> grad(layers.size()), adj(layers.size());
+    for(size_t k=0;k<layers.size();k++)adj[k].assign(layers[k].out,0.0);
+    const size_t last=layers.size()-1;
+    for(int r=0;r<layers[last].out;r++)adj[last][r]=2.0*(a[last][r]-target[r])/layers[last].out;
+    for(int k=int(last);k>=0;k--){
+      const Layer& l=layers[static_cast<size_t>(k)];
+      grad[static_cast<size_t>(k)].resize(l.out);
+      for(int r=0;r<l.out;r++)
+        grad[static_cast<size_t>(k)][r]=adj[static_cast<size_t>(k)][r]*derivative(z[static_cast<size_t>(k)][r],a[static_cast<size_t>(k)][r],l.type);
+      int offset=0;
+      for(int parent:l.sources){
+        const int length=parent==-1?ninput:layers[static_cast<size_t>(parent)].out;
+        if(parent!=-1){
+          auto& upstream=adj[static_cast<size_t>(parent)];
+          for(int c=0;c<length;c++){
+            double incoming=0;
+            for(int r=0;r<l.out;r++)incoming+=l.effective(static_cast<size_t>(r)*l.in+static_cast<size_t>(offset+c))*grad[static_cast<size_t>(k)][r];
+            upstream[c]+=incoming;
+            finite(upstream[c],"graph backpropagation gradient");
+          }
+        }
+        offset+=length;
       }
+      require(offset==l.in,"graph backpropagation shape mismatch");
     }
-    // All gradients calculated using old weights; update after backpropagation.
+    // All gradients are calculated using the OLD weights; only then update.
     for(size_t k=0;k<layers.size();k++){
-      Layer& l=layers[k];const auto& prev=k?a[k-1]:input;
+      Layer& l=layers[k];std::vector<double> joined;const auto& prev=layer_input(k,joined);
       for(int r=0;r<l.out;r++){
         for(int c=0;c<l.in;c++){
           size_t ix=static_cast<size_t>(r)*l.in+c;
@@ -294,6 +345,7 @@ public:
   // per-change baseline. Accept AUTO only with repeated measurable advantage.
   // The model's weights, topology and input remain unmodified.
   void optimize(int rounds){
+    require(!graph,"graph delta optimization not implemented");
     require(has_input,"observe before optimize");
     require(rounds>=20 && rounds<=2000,"optimize rounds invalid");
     infer(false);
@@ -380,9 +432,11 @@ public:
     }
     std::ofstream out(path,std::ios::out);
     require(bool(out),"cannot write model");
-    out<<std::setprecision(17)<<"NLMODEL2\n"<<ninput<<' '<<layers.size()<<"\n"<<int(mode)<<"\n";
+    out<<std::setprecision(17)<<(graph?"NLMODEL3\n":"NLMODEL2\n")<<ninput<<' '<<layers.size()<<"\n"<<int(mode)<<"\n";
     for(const auto& l:layers){
-      out<<l.name<<' '<<l.in<<' '<<l.out<<' '<<l.type<<' '<<l.storage<<"\n";
+      out<<l.name<<' '<<l.in<<' '<<l.out<<' '<<l.type<<' '<<l.storage;
+      if(graph){out<<' '<<l.sources.size();for(int source:l.sources)out<<' '<<source;}
+      out<<"\n";
       for(double v:l.b){finite(v,"saved bias");out<<v<<' ';}out<<"\n";
       for(size_t k=0;k<l.weight_count();k++){
         const double w=l.raw(k);finite(w,"saved weight");out<<w<<' ';
@@ -405,7 +459,7 @@ public:
     std::ifstream in(path);
     require(bool(in),"cannot open model");
     std::string marker;int input_size=0;size_t layer_count=0;
-    require(bool(in>>marker>>input_size>>layer_count) && marker=="NLMODEL2" &&
+    require(bool(in>>marker>>input_size>>layer_count) && marker==(graph?"NLMODEL3":"NLMODEL2") &&
             input_size==ninput && layer_count==layers.size(),"model header/shape mismatch");
     int stored_mode=0;require(bool(in>>stored_mode) && stored_mode>=0 && stored_mode<=2,"invalid saved optimizer mode");
     auto staged=layers;
@@ -414,6 +468,10 @@ public:
       require(bool(in>>name>>ni>>no>>ty>>st) &&
               name==l.name && ni==l.in && no==l.out && ty==l.type && st==l.storage,
               "model layer mismatch");
+      if(graph){
+        size_t source_count=0;require(bool(in>>source_count) && source_count==l.sources.size(),"model parent count mismatch");
+        for(int source:l.sources){int actual=-100;require(bool(in>>actual) && actual==source,"model graph topology mismatch");}
+      }
       for(auto& b:l.b){
         require(bool(in>>b),"truncated model bias");finite(b,"loaded bias");
       }
@@ -444,13 +502,14 @@ public:
     t.layers=layers;t.input=input;t.z=z;t.a=a;
     t.has_input=has_input;t.cache=cache;t.version=version;t.cache_version=cache_version;
     t.pending=pending;t.pending_layer=pending_layer;t.delta_streak=delta_streak;
-    t.mode=mode;
+    t.mode=mode;t.graph=graph;
     return t;
   }
   // Differential self-check invoked by `.nir` VERIFY. Work happens only on
   // independent copies; not a benchmark, not evidence of general correctness.
   // Compare each layer's preactivation and activation, not merely final output.
   void verify(int rounds){
+    require(!graph,"graph delta verification not implemented");
     require(has_input,"observe before verify");
     require(!layers.empty(),"verify requires layers");
     require(rounds>=1 && rounds<=2000,"verify rounds outside 1..2000");
@@ -536,6 +595,7 @@ public:
   }
   // Native, non-LLM development assistant: measure two kernels, check equivalence, never edit originals.
   void advise(int rounds){
+    require(!graph,"graph delta profiling not implemented");
     require(has_input,"observe before advise");require(rounds>=1&&rounds<=100000,"advice rounds invalid");
     infer(false);
     auto run=[&](Mode md, bool& ok)->std::pair<double,double> {
@@ -604,7 +664,7 @@ public:
       require(found,"no free report filename");
     }
     std::ofstream f(destination,std::ios::out);require(bool(f),"cannot create report");
-    f<<"{\n  \"language\":\"Neural Language 0.2\",\n  \"model\":\""<<escape(name)<<"\",\n  \"version\":"<<version<<",\n  \"weights\":"<<weight_count()<<",\n";
+    f<<"{\n  \"language\":\"Neural Language 0.4\",\n  \"model\":\""<<escape(name)<<"\",\n  \"version\":"<<version<<",\n  \"weights\":"<<weight_count()<<",\n";
     f<<"  \"mode\":\""<<(mode==AUTO?"AUTO":(mode==FULL?"FULL":"DELTA"))<<"\",\n";
     f<<"  \"counts\":{\"full\":"<<counters.full<<",\"delta\":"<<counters.delta<<",\"train\":"<<counters.train<<",\"changes\":"<<counters.events<<",\"auto_full\":"<<counters.auto_full<<",\"auto_delta\":"<<counters.auto_delta<<",\"blas_layers\":"<<counters.blas_layers<<"},\n";
     f<<"  \"events\":[";for(size_t i=0;i<events.size();i++)f<<(i?",":"")<<"\""<<escape(events[i])<<"\"";f<<"]\n}\n";

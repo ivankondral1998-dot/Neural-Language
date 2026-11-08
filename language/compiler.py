@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Neural Language 0.2: source -> validated Neural IR -> C++17 -> native binary.
+"""Neural Language 0.4: source -> validated Neural IR -> C++17 -> native binary.
 This is a bootstrap compiler, not the language runtime. No eval or arbitrary code execution.
 """
 from __future__ import annotations
@@ -85,14 +85,28 @@ def parse(text):
         if t[0]=='senses' and len(t)==2:
             if senses is not None:fail(line,"duplicate senses")
             senses=integer(t[1],line,1,2048)
-        elif t[0]=='neurons' and len(t) in (4,5):
+        elif t[0]=='neurons' and len(t)>=4:
             nm=ident(t[1],line)
-            if nm in seen:fail(line,"duplicate neuron layer")
+            if nm in seen or nm=='input':fail(line,"duplicate or reserved neuron layer")
+            if t[3] not in ('linear','relu','sigmoid'):fail(line,"activation must be linear, relu or sigmoid")
+            size=integer(t[2],line,1,4096)
+            rest=t[4:]
+            storage='float'
+            if rest and rest[0] in ('float','int8'):
+                storage=rest.pop(0)
+            implicit=[neurons[-1]['name']] if neurons else ['input']
+            parents=implicit
+            if rest:
+                if rest[0]!='from' or len(rest)<2:fail(line,"expected 'from input' or 'from earlier_layer ...'")
+                parents=rest[1:]
+                if len(parents)>8:fail(line,"too many parent sources")
+                if len(set(parents))!=len(parents):fail(line,"duplicate parent source")
+                for parent in parents:
+                    ident(parent,line)
+                    if parent!='input' and parent not in seen:
+                        fail(line,"parent must be an earlier neuron layer or input: "+parent)
+            neurons.append({'name':nm,'size':size,'activation':t[3],'storage':storage,'sources':parents})
             seen.add(nm)
-            storage=t[4] if len(t)==5 else 'float'
-            if storage not in ('float','int8'): fail(line,"storage must be float or int8")
-            neurons.append({'name':nm,'size':integer(t[2],line,1,4096),'activation':t[3],'storage':storage})
-            if t[3] not in ('linear','relu','sigmoid'): fail(line,"activation must be linear, relu or sigmoid")
             if len(neurons)>8:fail(line,"maximum eight neuron layers")
         elif t[0]=='budget' and len(t)==3:
             if budget is not None: fail(line,"duplicate budget")
@@ -101,26 +115,43 @@ def parse(text):
         else:fail(line,"invalid brain declaration: "+s)
     else:raise CompileError("brain block missing }")
     if senses is None or not neurons: raise CompileError("brain needs senses and at least one neurons layer")
-    shapes={};prev=senses;total=0
-    for n in neurons:
-        total+=prev*n['size']; shapes[n['name']]=(n['size'],prev);prev=n['size']
-    if total>4000000:raise CompileError("brain exceeds total weight budget")
-    # Static resident numeric tensors only: one owning weight array per layer,
-    # gate bytes, biases, cached preactivations/activations, and input.
-    # This excludes vectors/maps/allocator overhead, checkpoints, advise clones,
-    # pending change queues and temporary training gradients. Not a process RSS cap.
-    weight_bytes=0; storage_bytes=8*senses; macs=0; prev=senses
-    for n in neurons:
-        width=1 if n['storage']=='int8' else 8
-        weight_bytes += prev*n['size']*width
-        storage_bytes += prev*n['size']*(width+1) + n['size']*(8+16)
-        macs += prev*n['size']
+    # A topologically ordered, feed-forward DAG. Parent values are concatenated
+    # in the order written in the source. Output is the last declared layer.
+    dimensions={'input':senses}
+    shapes={};total=0;macs=0;weight_bytes=0;storage_bytes=8*senses
+    prev=senses
+    graph=False
+    for k,n in enumerate(neurons):
+        expected=[neurons[k-1]['name']] if k else ['input']
+        if n['sources']!=expected:graph=True
+        width=sum(dimensions[p] for p in n['sources'])
+        total+=width*n['size'];macs+=width*n['size']
+        width_bytes=1 if n['storage']=='int8' else 8
+        weight_bytes+=width*n['size']*width_bytes
+        storage_bytes+=width*n['size']*(width_bytes+1)+n['size']*(8+16)
+        shapes[n['name']]=(n['size'],width)
+        dimensions[n['name']]=n['size']
         prev=n['size']
+    if total>4000000:raise CompileError("brain exceeds total weight budget")
+    # A declared branch that cannot reach the sole output has no trainable
+    # purpose in this version. Reject silent dead ends, not merely cycles.
+    if graph:
+        by_name={n['name']:n for n in neurons}
+        connected=set()
+        def visit(name):
+            if name=='input' or name in connected:return
+            connected.add(name)
+            for parent in by_name[name]['sources']:visit(parent)
+        visit(neurons[-1]['name'])
+        dead=[n['name'] for n in neurons if n['name'] not in connected]
+        if dead:raise CompileError("neuron layers not connected to output: "+', '.join(dead))
+    # Static resident tensor estimate, not a hard RSS bound; the graph's
+    # temporary concatenation vectors and training workspaces are excluded.
     if budget is not None and (storage_bytes>budget[0] or macs>budget[1]):
         raise CompileError(f"budget exceeded: {storage_bytes} resident tensor bytes / {macs} forward MACs > {budget[0]} / {budget[1]}")
     model={'name':name,'senses':senses,'neurons':neurons,'init':seed,'weights':total,
            'weight_bytes':weight_bytes,'storage_bytes':storage_bytes,
-           'macs':macs,'budget':budget,'budget_scope':'resident numeric tensors and forward MACs only'}
+           'macs':macs,'budget':budget,'budget_scope':'resident numeric tensors and forward MACs only', 'graph':graph}
     def ops(nested=False,depth=0):
         nonlocal i
         if depth>8:raise CompileError("cycle nesting limit exceeded")
@@ -200,8 +231,15 @@ def parse(text):
             if n>1000000:raise CompileError("program exceeds one million operations")
         return n
     steps=cost(program)
+    if graph:
+        def check_graph_ops(xs):
+            for x in xs:
+                if x['op']=='cycle':check_graph_ops(x['body'])
+                elif x['op'] in ('advise','verify','optimize') or (x['op']=='tune' and x['mode']=='incremental'):
+                    fail(x['line'],"incremental/delta benchmarking is not implemented for branching graphs")
+        check_graph_ops(program)
     if not program: raise CompileError("brain needs executable instructions")
-    return {'ir_version':'NeuralIR/0.2','brain':model,'operations':program,'estimated_max_operations':steps}
+    return {'ir_version':'NeuralIR/0.4-graph' if graph else 'NeuralIR/0.2','brain':model,'operations':program,'estimated_max_operations':steps}
 
 def analyze_ir(ir):
     """Deterministic compiler-side developer assistant; no external model."""
@@ -215,6 +253,8 @@ def analyze_ir(ir):
             elif op['op'] in counts:counts[op['op']]+=scale
     scan(ir['operations'])
     messages=[]
+    if b.get('graph'):
+        messages.append('DAG branch/merge graph: ordered parent activations concatenate at each layer; native full recomputation only. No graph delta speed claim.')
     if any(layer.get('storage')=='int8' for layer in b['neurons']):
         messages.append('INT8 uses fixed scale 1/127; small training steps can round to zero; validate convergence separately.')
     if counts['learn'] and not counts['predict']:
@@ -257,7 +297,11 @@ def emit(ir):
     for k,l in enumerate(b['neurons']):
         typ={'linear':0,'relu':1,'sigmoid':2}[l['activation']]
         store=1 if l.get('storage')=='int8' else 0
-        lines.append(f'brain.layer({string(l["name"])},{l["size"]},{typ},static_cast<uint32_t>({b["init"]}ULL+{k}*31337ULL),{store});')
+        if b.get('graph'):
+            srcs='std::vector<std::string>{'+','.join(string(p) for p in l['sources'])+'}'
+            lines.append(f'brain.layer_sources({string(l["name"])},{l["size"]},{typ},static_cast<uint32_t>({b["init"]}ULL+{k}*31337ULL),{store},{srcs});')
+        else:
+            lines.append(f'brain.layer({string(l["name"])},{l["size"]},{typ},static_cast<uint32_t>({b["init"]}ULL+{k}*31337ULL),{store});')
     def block(ops,depth=0):
         for j,x in enumerate(ops):
             o=x['op']
