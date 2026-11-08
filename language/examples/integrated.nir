@@ -1,0 +1,33 @@
+# Integrated Neural Language workflow: design -> train -> held-out validation
+# -> native numerical self-check -> opt-in optimization -> revalidation -> report.
+# Training samples (four corners) only. Validation inputs below are not trained on.
+brain IntegratedLinear {
+  senses 2
+  neurons answer 1 linear
+  init 17
+  budget 65536 64
+}
+
+cycle 400 {
+  observe [0, 0]
+  learn [0] rate 0.1
+  observe [1, 0]
+  learn [0.6] rate 0.1
+  observe [0, 1]
+  learn [0.2] rate 0.1
+  observe [1, 1]
+  learn [0.8] rate 0.1
+}
+
+remember trained
+validate [0.25, 0.75] target [0.3] tolerance 0.02
+validate [0.75, 0.35] target [0.52] tolerance 0.02
+observe [0.25, 0.75]
+verify 40
+optimize 90
+validate [0.25, 0.75] target [0.3] tolerance 0.02
+validate [0.75, 0.35] target [0.52] tolerance 0.02
+predict
+save_model "trained.nlw"
+inspect
+report "integrated_result.json"
