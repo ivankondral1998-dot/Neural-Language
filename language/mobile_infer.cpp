@@ -143,6 +143,54 @@ std::vector<double> parse_csv(const std::string& source){
 }
 } // namespace nlmobile
 
+// Stable C ABI for Android NDK/JNI bridges and other native embedding layers.
+// The caller owns the returned handle and must call nlmobile_close.
+namespace {
+thread_local std::string nlmobile_error;
+}
+extern "C" {
+void* nlmobile_open(const char* path, std::size_t byte_limit) noexcept {
+    try {
+        nlmobile_error.clear();
+        nlmobile::check(path != nullptr, "model path is null");
+        return new nlmobile::Model(nlmobile::Model::load(path, byte_limit));
+    } catch (const std::exception& e) {
+        nlmobile_error = e.what();
+        return nullptr;
+    }
+}
+std::size_t nlmobile_input_count(const void* handle) noexcept {
+    return handle ? static_cast<const nlmobile::Model*>(handle)->input_size : 0;
+}
+std::size_t nlmobile_output_count(const void* handle) noexcept {
+    const auto* model = static_cast<const nlmobile::Model*>(handle);
+    return model && !model->layers.empty() ? static_cast<std::size_t>(model->layers.back().out) : 0;
+}
+std::size_t nlmobile_tensor_payload_bytes(const void* handle) noexcept {
+    const auto* model = static_cast<const nlmobile::Model*>(handle);
+    return model ? model->payload_bytes + model->activation_bytes : 0;
+}
+int nlmobile_predict(void* handle, const double* input, std::size_t input_count,
+                     double* output, std::size_t output_capacity) noexcept {
+    try {
+        nlmobile_error.clear();
+        nlmobile::check(handle != nullptr && input != nullptr && output != nullptr, "null inference argument");
+        auto* model = static_cast<nlmobile::Model*>(handle);
+        nlmobile::check(input_count == static_cast<std::size_t>(model->input_size), "input shape mismatch");
+        const std::vector<double> values(input, input + input_count);
+        const auto prediction = model->predict(values);
+        nlmobile::check(output_capacity >= prediction.size(), "output buffer too small");
+        std::copy(prediction.begin(), prediction.end(), output);
+        return static_cast<int>(prediction.size());
+    } catch (const std::exception& e) {
+        nlmobile_error = e.what();
+        return -1;
+    }
+}
+const char* nlmobile_last_error() noexcept { return nlmobile_error.c_str(); }
+void nlmobile_close(void* handle) noexcept { delete static_cast<nlmobile::Model*>(handle); }
+}
+
 #ifndef NL_MOBILE_LIBRARY_ONLY
 int main(int argc,char** argv){
     try {
