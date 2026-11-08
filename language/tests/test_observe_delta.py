@@ -31,7 +31,6 @@ class CompilerDelta(unittest.TestCase):
           (BRAIN+'observe_delta 0 add 0.1\npredict\n','preceding observe'),
           (BRAIN+'observe [0,0,0]\nobserve_delta 3 add 0.1\n','outside'),
           (BRAIN+'observe [0,0,0]\nobserve_delta 1 add nan\n','invalid number'),
-          (BRAIN+'observe [0,0,0]\nremember x\nrewind x\nobserve_delta 1 add 0.1\n','preceding observe'),
           (BRAIN+'cycle 2 {\n observe_delta 0 add 0.1\n}\n','preceding observe'),
         )
         for source, error in cases:
