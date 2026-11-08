@@ -453,7 +453,7 @@ def verify_typed_ir(ir):
             kind = op.get('op')
             require(type(kind) is str and kind in _EFFECTS or kind == 'cycle',
                     'unsupported IR operation')
-            uint(op.get('line'), 1, 5000, f'{kind} line')
+            uint(op.get('line'), 1, (1 << 31) - 1, f'{kind} line')
             if kind == 'cycle':
                 count = uint(op.get('count'), 1, 100000, 'cycle count')
                 body = op.get('body')
@@ -643,9 +643,16 @@ def main(argv=None):
         src=args.source.read_text(encoding='utf-8')
         ir=parse(src);ir['source_sha256']=hashlib.sha256(src.encode('utf-8')).hexdigest()
         ir['compiler_advice']=analyze_ir(ir)
-        out=args.output.resolve();out.parent.mkdir(parents=True,exist_ok=True)
-        cpp=out.with_suffix('.cpp');cpp.write_text(emit(ir),encoding='utf-8')
-        out.with_suffix('.nir.json').write_text(json.dumps(ir,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+        out=args.output.resolve()
+        cpp=out.with_suffix('.cpp')
+        ir_file=out.with_suffix('.nir.json')
+        # Prevent compiler-generated outputs from replacing the source program.
+        # resolve() also catches symlink aliases, before any output is written.
+        if args.source.resolve() in (out, cpp, ir_file):
+            raise CompileError('output would overwrite input source; choose another --output path')
+        out.parent.mkdir(parents=True,exist_ok=True)
+        cpp.write_text(emit(ir),encoding='utf-8')
+        ir_file.write_text(json.dumps(ir,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
         print('COMPILED IR:',out.with_suffix('.nir.json'))
         print('COMPILER ADVICE:', '; '.join(ir['compiler_advice']['advice']))
         if args.emit_only:return 0
