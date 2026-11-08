@@ -61,3 +61,7 @@ python3 -m unittest -q tests.test_hardening
 Изолированная ветка `feature/typed-changes-effects-20261108` интегрирует проверку `NeuralShapes/1` с уже действующими `NeuralEffects/1` и `NeuralChanges/1`. `observe_delta` имеет типизированные индекс и числовое изменение; повреждённые формы, бюджеты, операнды и метаданные IR отвергаются **до** нативной генерации. Полный отчёт: [docs/NEURAL_SHAPES_EFFECTS_CHANGES_20261108_RU.md](docs/NEURAL_SHAPES_EFFECTS_CHANGES_20261108_RU.md). 12 новых тестов и 73 завершённых старых теста PASS отдельными группами; девять исходных C++-выходов побайтно сохранены. Это всё ещё последовательный dense-язык: DAG и Android/ARM64 не проверены.
 
 Для повторения из корня: `cd language && python3 -m unittest -q tests.test_shapes_changes_integration`; для сквозного прогона: `bash run.sh` из корня.
+
+## NL-COMP-006 — DAG и выборочное обновление нейронных состояний
+
+Экспериментальная ветка `feature/dag-change-aware-20261109` объединяет графовые зависимости (`neurons ... from ...`) с существующими `NeuralShapes/1`, `NeuralEffects/1`, `NeuralChanges/1` и нативным выборочным пересчётом изменённого входа. [Точный отчёт, тесты, отрицательные случаи и сравнение с OpenBLAS](docs/NL_COMP_006_DAG_CHANGES_RU.md). Старые последовательные программы сохраняют исходный C++; графовый формат модели — `NLMODEL3` и пока не совместим с мобильным пакером. Это результат Linux x86-64, **не доказанное преимущество Android**; main не меняется.
