@@ -68,7 +68,7 @@ struct Layer {
     } else w[i]=value;
   }
 };
-struct Counters {size_t full=0,delta=0,train=0,events=0,auto_full=0,auto_delta=0,blas_layers=0;};
+struct Counters {size_t full=0,delta=0,train=0,events=0,auto_full=0,auto_delta=0,blas_layers=0;size_t input_events=0,input_delta=0,input_auto_full=0;};
 struct Snapshot {std::vector<Layer> layers;uint64_t version;std::vector<double> input;bool has_input;};
 class Model {
 public:
@@ -78,6 +78,8 @@ public:
   std::map<std::string,Snapshot> saved;
   struct Pending {int row, col;double difference;};
   std::vector<Pending> pending;
+  struct InputPending {int col;double difference;};
+  std::vector<InputPending> pending_input;
   int pending_layer=-1;
   size_t delta_streak=0;
   enum Mode {AUTO=0,FULL=1,DELTA=2};Mode mode=AUTO;
@@ -95,7 +97,24 @@ public:
     layers.push_back(std::move(l));
     z.resize(layers.size());a.resize(layers.size());
   }
-  void observe(std::vector<double> x){require((int)x.size()==ninput,"input shape mismatch");for(double v:x)finite(v,"input");if(!has_input||x!=input) {cache=false;pending.clear();pending_layer=-1;delta_streak=0;} input=std::move(x);has_input=true;}
+  void observe(std::vector<double> x){require((int)x.size()==ninput,"input shape mismatch");for(double v:x)finite(v,"input");if(!has_input||x!=input) {cache=false;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;} input=std::move(x);has_input=true;}
+  // A new language-level input patch. An existing observe is required.
+  // Consecutive changes are staged and propagated as a single batch on demand.
+  void change_input(int col,double requested){
+    require(has_input,"observe before observe_delta");
+    require(col>=0 && col<ninput,"observe_delta input index invalid");
+    finite(requested,"observe_delta amount");
+    if(!pending.empty()) infer(false); // commit previous weight edits before input changes
+    const double old=input[static_cast<size_t>(col)];
+    const double updated=old+requested;finite(updated,"observe_delta new input");
+    const double actual=updated-old;
+    input[static_cast<size_t>(col)]=updated;
+    version++;counters.input_events++;
+    if(actual==0){if(cache && pending_input.empty())cache_version=version;return;}
+    if(mode==FULL || !cache){cache=false;pending_input.clear();delta_streak=0;return;}
+    pending_input.push_back({col,actual});
+    if(pending_input.size()>4096){cache=false;pending_input.clear();delta_streak=0;}
+  }
   // All full passes use the same FP64 weights, activation semantics and mask.
   // A BLAS matrix-vector multiply is used only when every edge is enabled.
   void forward() {
@@ -118,7 +137,7 @@ public:
         }
       }
     }
-    cache=true;cache_version=version;pending.clear();pending_layer=-1;delta_streak=0;counters.full++;
+    cache=true;cache_version=version;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;counters.full++;
   }
   size_t weight_count()const {size_t n=0;for(auto& l:layers)n+=l.weight_count();return n;}
   size_t full_cost()const {return weight_count();}
@@ -174,9 +193,54 @@ public:
     cache=true;cache_version=version;pending.clear();pending_layer=-1;
     delta_streak++;counters.delta++;if(mode==AUTO)counters.auto_delta++;
   }
+  // Input deltas are a distinct effect: unlike observe(), they preserve the
+  // previous cached state and can reuse downstream activations if worthwhile.
+  void flush_input_pending(){
+    if(pending_input.empty())return;
+    require(cache && pending.empty() && !layers.empty(),"input delta cache state invalid");
+    const Layer& first=layers.front();
+    const double full=double(full_cost())*(has_blas?0.35:0.85)+256.0*layers.size();
+    // Calibrated conservatively from a separate x86-64 OpenBLAS sweep:
+    // column-wise weight access is strided in row-major storage and much
+    // costlier per MAC than contiguous full GEMV. This is not a mobile model.
+    double estimate=14.0*pending_input.size()*first.out+2.0*first.out;
+    for(size_t k=1;k<layers.size();k++)estimate+=double(layers[k-1].out)*layers[k].out;
+    const bool choose=(mode==DELTA || (mode==AUTO && full_cost()>=1024 && estimate<full*0.70))
+                 && delta_streak<128;
+    if(!choose){if(mode==AUTO){counters.auto_full++;counters.input_auto_full++;}forward();return;}
+    std::vector<double> change(first.out,0.0);
+    for(const auto& p:pending_input)
+      for(int r=0;r<first.out;r++)
+        change[r]+=first.effective(static_cast<size_t>(r)*first.in+p.col)*p.difference;
+    std::vector<int> active;
+    for(int r=0;r<first.out;r++){
+      if(change[r]==0.0)continue;
+      const double old=a[0][r];z[0][r]+=change[r];finite(z[0][r],"input delta preactivation");
+      a[0][r]=act(z[0][r],first.type);change[r]=a[0][r]-old;
+      if(change[r]!=0.0)active.push_back(r);
+    }
+    for(size_t k=1;k<layers.size();k++){
+      if(active.empty())break;
+      const Layer& next=layers[k];
+      std::vector<double> next_change(next.out,0.0);
+      std::vector<int> next_active;
+      for(int r=0;r<next.out;r++){
+        double dz=0.0;const size_t row=static_cast<size_t>(r)*next.in;
+        for(int col:active)dz+=next.effective(row+static_cast<size_t>(col))*change[col];
+        const double old=a[k][r];z[k][r]+=dz;finite(z[k][r],"input delta propagated preactivation");
+        a[k][r]=act(z[k][r],next.type);next_change[r]=a[k][r]-old;
+        if(next_change[r]!=0.0)next_active.push_back(r);
+      }
+      change=std::move(next_change);active=std::move(next_active);
+    }
+    cache=true;cache_version=version;pending_input.clear();
+    delta_streak++;counters.delta++;counters.input_delta++;
+    if(mode==AUTO)counters.auto_delta++;
+  }
   const std::vector<double>& infer(bool announce=true){
     if(!cache)forward();
     else if(!pending.empty())flush_pending();
+    else if(!pending_input.empty())flush_input_pending();
     else if(cache_version!=version)forward();
     require(!layers.empty(),"empty network");
     if(announce){std::cout<<"PREDICT version="<<version<<" values=";for(size_t i=0;i<a.back().size();i++)std::cout<<(i?",":"")<<std::setprecision(10)<<a.back()[i];std::cout<<"\n";}return a.back();
@@ -186,6 +250,7 @@ public:
   // Weight changes are staged; flush only when a prediction/learning step needs
   // activations. Different-layer batches fall back to a safe full recompute.
   void mutate(int l,int row,int col,double new_weight,int new_gate) {
+    if(!pending_input.empty())infer(false); // different effect epoch; never mix stale inputs/weights
     size_t ix=index(l,row,col);Layer& L=layers[l];finite(new_weight,"weight");
     require(new_gate==0||new_gate==1,"gate invalid");
     const double old=L.effective(ix);const int old_gate=L.enabled[ix];
@@ -240,10 +305,10 @@ public:
         double b=l.b[r]-rate*grad[k][r];finite(b,"updated bias");l.b[r]=b;
       }
     }
-    version++;cache=false;pending.clear();pending_layer=-1;delta_streak=0;counters.train++;
+    version++;cache=false;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;counters.train++;
   }
   void checkpoint(const std::string& label){require(saved.count(label)==0,"checkpoint already exists; use a new name");require(saved.size()<64,"checkpoint limit");saved[label]=Snapshot{layers,version,input,has_input};std::cout<<"CHECKPOINT "<<label<<" version="<<version<<"\n";}
-  void restore(const std::string& label){auto it=saved.find(label);require(it!=saved.end(),"unknown checkpoint: "+label);layers=it->second.layers;input=it->second.input;has_input=it->second.has_input;version++;cache=false;pending.clear();pending_layer=-1;delta_streak=0;std::cout<<"RESTORE "<<label<<" version="<<version<<"\n";}
+  void restore(const std::string& label){auto it=saved.find(label);require(it!=saved.end(),"unknown checkpoint: "+label);layers=it->second.layers;input=it->second.input;has_input=it->second.has_input;version++;cache=false;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;std::cout<<"RESTORE "<<label<<" version="<<version<<"\n";}
   void expect(const std::vector<double>& expected,double tol) {
     require(std::isfinite(tol) && tol>=0.0,"expect tolerance must be finite and nonnegative");
     for(double value:expected)require(std::isfinite(value),"expect target must be finite");
@@ -432,7 +497,7 @@ public:
     }
     std::string end;require(bool(in>>end) && end=="END","invalid model terminator");
     in>>std::ws;require(in.peek()==std::char_traits<char>::eof(),"trailing model data");
-    layers=std::move(staged);mode=static_cast<Mode>(stored_mode);version++;cache=false;pending.clear();pending_layer=-1;delta_streak=0;
+    layers=std::move(staged);mode=static_cast<Mode>(stored_mode);version++;cache=false;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;
     std::cout<<"MODEL_LOADED "<<path<<" version="<<version<<"\n";
   }
   void inspect()const {std::cout<<"INSPECT model="<<name<<" layers="<<layers.size()<<" weights="<<weight_count()<<" version="<<version<<" cache="<<(cache?(pending.empty()?"valid":"pending"):"invalid")<<" pending="<<pending.size()<<"\n";}
@@ -443,7 +508,7 @@ public:
     Model t(name,ninput);
     t.layers=layers;t.input=input;t.z=z;t.a=a;
     t.has_input=has_input;t.cache=cache;t.version=version;t.cache_version=cache_version;
-    t.pending=pending;t.pending_layer=pending_layer;t.delta_streak=delta_streak;
+    t.pending=pending;t.pending_input=pending_input;t.pending_layer=pending_layer;t.delta_streak=delta_streak;
     t.mode=mode;
     return t;
   }
@@ -606,7 +671,7 @@ public:
     std::ofstream f(destination,std::ios::out);require(bool(f),"cannot create report");
     f<<"{\n  \"language\":\"Neural Language 0.2\",\n  \"model\":\""<<escape(name)<<"\",\n  \"version\":"<<version<<",\n  \"weights\":"<<weight_count()<<",\n";
     f<<"  \"mode\":\""<<(mode==AUTO?"AUTO":(mode==FULL?"FULL":"DELTA"))<<"\",\n";
-    f<<"  \"counts\":{\"full\":"<<counters.full<<",\"delta\":"<<counters.delta<<",\"train\":"<<counters.train<<",\"changes\":"<<counters.events<<",\"auto_full\":"<<counters.auto_full<<",\"auto_delta\":"<<counters.auto_delta<<",\"blas_layers\":"<<counters.blas_layers<<"},\n";
+    f<<"  \"counts\":{\"full\":"<<counters.full<<",\"delta\":"<<counters.delta<<",\"train\":"<<counters.train<<",\"changes\":"<<counters.events<<",\"auto_full\":"<<counters.auto_full<<",\"auto_delta\":"<<counters.auto_delta<<",\"blas_layers\":"<<counters.blas_layers<<",\"input_events\":"<<counters.input_events<<",\"input_delta\":"<<counters.input_delta<<",\"input_auto_full\":"<<counters.input_auto_full<<"},\n";
     f<<"  \"events\":[";for(size_t i=0;i<events.size();i++)f<<(i?",":"")<<"\""<<escape(events[i])<<"\"";f<<"]\n}\n";
     require(bool(f),"report write failed");std::cout<<"REPORT "<<destination<<"\n";
   }

@@ -1,0 +1,23 @@
+test_dangling_symlink_report_not_followed (language.tests.test_hardening.HardeningTests.test_dangling_symlink_report_not_followed) ... ok
+test_expect_nan_rejected_in_runtime (language.tests.test_hardening.HardeningTests.test_expect_nan_rejected_in_runtime) ... ok
+test_invalid_unicode_escape_is_compile_error (language.tests.test_hardening.HardeningTests.test_invalid_unicode_escape_is_compile_error) ... ok
+test_report_bidi_rejected (language.tests.test_hardening.HardeningTests.test_report_bidi_rejected) ... ok
+test_report_newline_rejected (language.tests.test_hardening.HardeningTests.test_report_newline_rejected) ... ok
+test_report_safe_unicode (language.tests.test_hardening.HardeningTests.test_report_safe_unicode) ... ok
+test_report_utf8_byte_limit (language.tests.test_hardening.HardeningTests.test_report_utf8_byte_limit) ... ok
+test_very_large_integer_is_compile_error (language.tests.test_hardening.HardeningTests.test_very_large_integer_is_compile_error) ... ok
+test_budget_explicit_forward_macs (language.tests.test_quantization_fixes.FixedCompilerTests.test_budget_explicit_forward_macs) ... ok
+test_budget_includes_gate_and_cache (language.tests.test_quantization_fixes.FixedCompilerTests.test_budget_includes_gate_and_cache) ... ok
+test_byte_counts_and_ir_types (language.tests.test_quantization_fixes.FixedCompilerTests.test_byte_counts_and_ir_types) ... ok
+test_float_only_unaffected (language.tests.test_quantization_fixes.FixedCompilerTests.test_float_only_unaffected) ... ok
+test_cpp_int8_no_shadow_numerical_and_checkpoint (language.tests.test_quantization_fixes.NativeInt8Tests.test_cpp_int8_no_shadow_numerical_and_checkpoint) ... ok
+test_mutation_detects_old_int8_rounding_defect (language.tests.test_verifier.VerifierTests.test_mutation_detects_old_int8_rounding_defect) ... ok
+test_nir_executes_and_preserves_outputs (language.tests.test_verifier.VerifierTests.test_nir_executes_and_preserves_outputs) ... ok
+test_parser_and_ir (language.tests.test_verifier.VerifierTests.test_parser_and_ir) ... ok
+test_reject_invalid_verify_limits (language.tests.test_verifier.VerifierTests.test_reject_invalid_verify_limits) ... ok
+test_release_build_rejects_nan_and_infinity (language.tests.test_verifier.VerifierTests.test_release_build_rejects_nan_and_infinity) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 10.830s
+
+OK

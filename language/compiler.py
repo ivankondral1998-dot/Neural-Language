@@ -138,6 +138,10 @@ def parse(text):
                 out.append({'op':'cycle','count':count,'body':child,'line':line});continue
             mo=re.fullmatch(r"observe\s+(\[[^\]]*\])",s)
             if mo:out.append({'op':'observe','values':vector(mo.group(1),line,senses),'line':line});continue
+            mo=re.fullmatch(r"observe_delta\s+(\d+)\s+add\s+(\S+)",s)
+            if mo:
+                out.append({'op':'observe_delta','index':integer(mo.group(1),line,0,senses-1),
+                            'delta':num(mo.group(2),line),'line':line});continue
             if s=='predict':out.append({'op':'predict','line':line});continue
             mo=re.fullmatch(r"learn\s+(\[[^\]]*\])\s+rate\s+(\S+)",s)
             if mo:
@@ -201,14 +205,105 @@ def parse(text):
         return n
     steps=cost(program)
     if not program: raise CompileError("brain needs executable instructions")
-    return {'ir_version':'NeuralIR/0.2','brain':model,'operations':program,'estimated_max_operations':steps}
+    # Flow-sensitive precondition for the new operator. A rewind may restore an
+    # input but is conservatively treated as unknown until the next observe.
+    def check_input_epoch(items,known=False):
+        for op in items:
+            if op['op']=='observe':known=True
+            elif op['op']=='rewind':known=False
+            elif op['op']=='observe_delta' and not known:
+                fail(op['line'],"observe_delta requires a preceding observe after rewind")
+            elif op['op']=='cycle':known=check_input_epoch(op['body'],known)
+        return known
+    check_input_epoch(program)
+    result={'ir_version':'NeuralIR/0.2','brain':model,'operations':program,
+            'estimated_max_operations':steps}
+    # Additive semantic IR metadata; never silently claim general DAG support.
+    def collect_deltas(items):
+        found=[]
+        for op in items:
+            if op['op']=='observe_delta':found.append(op)
+            elif op['op']=='cycle':found.extend(collect_deltas(op['body']))
+        return found
+    deltas=collect_deltas(program)
+    if deltas:
+        result['neural_changes']={
+            'contract':'NeuralChanges/1','topology':'sequential_dense_only',
+            'input_width':senses,
+            'dependencies':[{'source':'input' if k==0 else neurons[k-1]['name'],
+                             'target':n['name']} for k,n in enumerate(neurons)],
+            'operation':'observe_delta','effect':{'reads':['input','weights','cache'],
+                'writes':['input','cache'],'requires_observe':True},
+            'occurrences':[{'line':x['line'],'index':x['index']} for x in deltas],
+            'semantic':'input[index] += delta, then mathematically full forward at next use; '
+                       'incremental evaluation allowed within numerical tolerance'
+        }
+    verify_neural_changes(result)
+    return result
+
+
+def verify_neural_changes(ir):
+    """Validate the additive NeuralChanges/1 contract before analysis or codegen.
+
+    This is deliberately narrow; it is not a general-purpose typed DAG verifier.
+    """
+    brain=ir.get('brain')
+    if not isinstance(brain,dict):raise CompileError('NeuralChanges: missing brain')
+    senses=brain.get('senses')
+    if type(senses) is not int or not (1<=senses<=2048):
+        raise CompileError('NeuralChanges: input width invalid')
+    neurons=brain.get('neurons')
+    if not isinstance(neurons,list) or not neurons:
+        raise CompileError('NeuralChanges: neuron structure invalid')
+    occurrences=[]
+    def visit(items,observed=False):
+        if not isinstance(items,list):raise CompileError('NeuralChanges: operations invalid')
+        for op in items:
+            if not isinstance(op,dict):raise CompileError('NeuralChanges: operation invalid')
+            kind=op.get('op')
+            if kind=='observe':observed=True
+            elif kind=='rewind':observed=False
+            elif kind=='observe_delta':
+                idx=op.get('index')
+                delta=op.get('delta')
+                lineno=op.get('line')
+                if not observed:raise CompileError('NeuralChanges: observe_delta requires observe')
+                if type(idx) is not int or not 0<=idx<senses:
+                    raise CompileError('NeuralChanges: observe_delta index invalid')
+                if type(delta) not in (int,float) or not math.isfinite(delta) or abs(delta)>=1e9:
+                    raise CompileError('NeuralChanges: observe_delta amount invalid')
+                if type(lineno) is not int or lineno<1:
+                    raise CompileError('NeuralChanges: physical line invalid')
+                occurrences.append({'line':lineno,'index':idx})
+            elif kind=='cycle':observed=visit(op.get('body'),observed)
+        return observed
+    visit(ir.get('operations'))
+    meta=ir.get('neural_changes')
+    if not occurrences:
+        if meta is not None:raise CompileError('NeuralChanges: orphan metadata')
+        return
+    if not isinstance(meta,dict) or meta.get('contract')!='NeuralChanges/1' or meta.get('topology')!='sequential_dense_only':
+        raise CompileError('NeuralChanges: contract missing or invalid')
+    deps=[]
+    for k,layer in enumerate(neurons):
+        if not isinstance(layer,dict) or type(layer.get('name')) is not str:
+            raise CompileError('NeuralChanges: invalid layer')
+        deps.append({'source':'input' if k==0 else neurons[k-1]['name'],
+                     'target':layer['name']})
+    if meta.get('dependencies')!=deps or meta.get('occurrences')!=occurrences or meta.get('input_width')!=senses:
+        raise CompileError('NeuralChanges: corrupted dependencies or occurrences')
+    if meta.get('operation')!='observe_delta' or meta.get('effect')!={
+        'reads':['input','weights','cache'],
+        'writes':['input','cache'],'requires_observe':True}:
+        raise CompileError('NeuralChanges: effect mismatch')
 
 def analyze_ir(ir):
     """Deterministic compiler-side developer assistant; no external model."""
+    verify_neural_changes(ir)
     b=ir['brain']
     n=sum(x['size'] for x in b['neurons'])
     weights=b['weights']
-    counts={k:0 for k in ('observe','predict','learn','weight','edge','remember','rewind','advise','verify','optimize','validate','save_model','load_model','inspect','report')}
+    counts={k:0 for k in ('observe','observe_delta','predict','learn','weight','edge','remember','rewind','advise','verify','optimize','validate','save_model','load_model','inspect','report')}
     def scan(ops,scale=1):
         for op in ops:
             if op['op']=='cycle':scan(op['body'],scale*op['count'])
@@ -221,6 +316,8 @@ def analyze_ir(ir):
         messages.append('Training has no explicit final prediction; add a held-out observation and predict to evaluate it.')
     if counts['learn']:
         messages.append('Learning uses local SGD on squared error; no evidence of generalization or resistance to forgetting.')
+    if counts['observe_delta']:
+        messages.append('Observe_delta is a stateful input patch; AUTO may use delta propagation or a full recompute; no guaranteed mobile win.')
     if counts['weight'] or counts['edge']:
         messages.append('Sparse mutation is supported; measure before assuming a runtime advantage.')
     if counts['verify']:
@@ -253,6 +350,7 @@ def string(s):
     return json.dumps(s,ensure_ascii=False)
 
 def emit(ir):
+    verify_neural_changes(ir)
     b=ir['brain']; lines=['#include "neural_runtime.hpp"','#include <exception>', 'int main() {','try {',f'neural::Model brain({string(b["name"])},{b["senses"]});']
     for k,l in enumerate(b['neurons']):
         typ={'linear':0,'relu':1,'sigmoid':2}[l['activation']]
@@ -264,6 +362,7 @@ def emit(ir):
             if o=='cycle':
                 v=f'n_{depth}_{j}';lines.append(f'for(int {v}=0;{v}<{x["count"]};++{v}) {{');block(x['body'],depth+1);lines.append('}')
             elif o=='observe':lines.append(f'brain.observe({vec(x["values"])});')
+            elif o=='observe_delta':lines.append(f'brain.change_input({x["index"]},{number(x["delta"])});')
             elif o=='predict':lines.append('brain.infer();')
             elif o=='learn':lines.append(f'brain.learn({vec(x["values"])},{number(x["rate"])});')
             elif o=='tune':lines.append('brain.mode=neural::Model::'+{'auto':'AUTO','full':'FULL','incremental':'DELTA'}[x['mode']]+';')
@@ -298,9 +397,14 @@ def main(argv=None):
         src=args.source.read_text(encoding='utf-8')
         ir=parse(src);ir['source_sha256']=hashlib.sha256(src.encode('utf-8')).hexdigest()
         ir['compiler_advice']=analyze_ir(ir)
-        out=args.output.resolve();out.parent.mkdir(parents=True,exist_ok=True)
-        cpp=out.with_suffix('.cpp');cpp.write_text(emit(ir),encoding='utf-8')
-        out.with_suffix('.nir.json').write_text(json.dumps(ir,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+        out=args.output.resolve()
+        cpp=out.with_suffix('.cpp')
+        ir_file=out.with_suffix('.nir.json')
+        if args.source.resolve() in (out,cpp,ir_file):
+            raise CompileError('output would overwrite source; choose another --output path')
+        out.parent.mkdir(parents=True,exist_ok=True)
+        cpp.write_text(emit(ir),encoding='utf-8')
+        ir_file.write_text(json.dumps(ir,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
         print('COMPILED IR:',out.with_suffix('.nir.json'))
         print('COMPILER ADVICE:', '; '.join(ir['compiler_advice']['advice']))
         if args.emit_only:return 0

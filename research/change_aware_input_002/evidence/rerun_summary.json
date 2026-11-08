@@ -1,0 +1,20 @@
+{
+  "runs": [
+    {
+      "compiler": "gcc",
+      "phase": "holdout",
+      "scenarios": 16,
+      "wins_20pct": 8,
+      "regressions_20pct": 0,
+      "max_scaled_error": 3.41227404606e-15
+    },
+    {
+      "compiler": "clang",
+      "phase": "holdout",
+      "scenarios": 16,
+      "wins_20pct": 8,
+      "regressions_20pct": 0,
+      "max_scaled_error": 3.41227404606e-15
+    }
+  ]
+}

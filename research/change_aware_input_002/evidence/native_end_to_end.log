@@ -1,0 +1,25 @@
+COMPILED IR: /mnt/data/neural_next/work/runs/run_eV1MrP/trainer.nir.json
+COMPILER ADVICE: Learning uses local SGD on squared error; no evidence of generalization or resistance to forgetting.; Verify: deterministic full-vs-incremental differential tests on isolated state copies; does not prove correctness against an independent oracle.; Optimize is an opt-in native runtime selection (AUTO vs FULL) on synthetic single-layer edits; it changes only mode, not weights or source. Not a general speed claim.; Validate runs declared examples on isolated state copies. Held-out provenance remains the author responsibility.; Model weights can be saved and loaded through a local versioned text format; only trusted local model files should be loaded.
+BUILT: /mnt/data/neural_next/work/runs/run_eV1MrP/trainer
+COMPILED IR: /mnt/data/neural_next/work/runs/run_eV1MrP/inference.nir.json
+COMPILER ADVICE: Validate runs declared examples on isolated state copies. Held-out provenance remains the author responsibility.; Model weights can be saved and loaded through a local versioned text format; only trusted local model files should be loaded.; No native advise command; strategy performance has not been measured.
+BUILT: /mnt/data/neural_next/work/runs/run_eV1MrP/inference
+CHECKPOINT trained version=1600
+VALIDATE PASS max_abs=5.551115123e-17 mse=3.081487911e-33 tolerance=0.02 original_unchanged=true
+VALIDATE PASS max_abs=0 mse=0 tolerance=0.02 original_unchanged=true
+VERIFY PASS rounds=40 values_compared=82 delta_paths=28 ref_full=33 max_abs_error=1.110223025e-16 original_unchanged=true
+OPTIMIZE selected=FULL full_median_ms=0.002283 auto_median_ms=0.002604 checked=270 equivalence=PASS workload=single_layer_edits weights_unchanged=true note=local_profile_not_general_speed_claim
+VALIDATE PASS max_abs=5.551115123e-17 mse=3.081487911e-33 tolerance=0.02 original_unchanged=true
+VALIDATE PASS max_abs=0 mse=0 tolerance=0.02 original_unchanged=true
+PREDICT version=1600 values=0.3
+MODEL_SAVED trained.nlw version=1600
+INSPECT model=IntegratedLinear layers=1 weights=2 version=1600 cache=valid pending=0
+REPORT integrated_result.json
+MODEL_LOADED trained.nlw version=1
+VALIDATE PASS max_abs=5.551115123e-17 mse=3.081487911e-33 tolerance=0.02 original_unchanged=true
+VALIDATE PASS max_abs=0 mse=0 tolerance=0.02 original_unchanged=true
+PREDICT version=1 values=0.3
+INSPECT model=IntegratedLinear layers=1 weights=2 version=1 cache=valid pending=0
+REPORT inference_result.json
+END_TO_END_PASS training native->save->load->native inference; heldout checks PASS
+RESULT_DIR: /mnt/data/neural_next/work/runs/run_eV1MrP

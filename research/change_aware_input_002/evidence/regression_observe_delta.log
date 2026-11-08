@@ -1,0 +1,12 @@
+test_cycle_accepted_after_observation (language.tests.test_observe_delta.CompilerDelta.test_cycle_accepted_after_observation) ... ok
+test_ir_contract_and_output (language.tests.test_observe_delta.CompilerDelta.test_ir_contract_and_output) ... ok
+test_legacy_cpp_identical_to_frozen_golden (language.tests.test_observe_delta.CompilerDelta.test_legacy_cpp_identical_to_frozen_golden) ... ok
+test_static_invalid_programs (language.tests.test_observe_delta.CompilerDelta.test_static_invalid_programs) ... ok
+test_tampered_neural_ir_rejected_before_codegen (language.tests.test_observe_delta.CompilerDelta.test_tampered_neural_ir_rejected_before_codegen) ... ok
+test_gcc_and_clang_compiled_programs_equivalent (language.tests.test_observe_delta.NativeDelta.test_gcc_and_clang_compiled_programs_equivalent) ... ok
+test_gcc_clang_randomized_oracle_stress (language.tests.test_observe_delta.NativeDelta.test_gcc_clang_randomized_oracle_stress) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 10.759s
+
+OK

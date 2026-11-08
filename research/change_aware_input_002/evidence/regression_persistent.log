@@ -1,0 +1,9 @@
+test_compiler_rejects_model_traversal (language.tests.test_integration.PersistentWeightsTests.test_compiler_rejects_model_traversal) ... ok
+test_missing_and_truncated_model_rejected (language.tests.test_integration.PersistentWeightsTests.test_missing_and_truncated_model_rejected) ... ok
+test_roundtrip_two_native_executables (language.tests.test_integration.PersistentWeightsTests.test_roundtrip_two_native_executables) ... ok
+test_save_and_load_masks_biases_int8 (language.tests.test_integration.PersistentWeightsTests.test_save_and_load_masks_biases_int8) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 9.167s
+
+OK

@@ -1,0 +1,15 @@
+test_bad_optimize_range_rejected (language.tests.test_integration.IntegratedSyntax.test_bad_optimize_range_rejected) ... ok
+test_bad_validation_input_rejected (language.tests.test_integration.IntegratedSyntax.test_bad_validation_input_rejected) ... ok
+test_bad_validation_target_rejected (language.tests.test_integration.IntegratedSyntax.test_bad_validation_target_rejected) ... ok
+test_negative_tolerance_rejected (language.tests.test_integration.IntegratedSyntax.test_negative_tolerance_rejected) ... ok
+test_ops_present_in_ir_and_native_cpp (language.tests.test_integration.IntegratedSyntax.test_ops_present_in_ir_and_native_cpp) ... ok
+test_evaluation_not_training (language.tests.test_integration.IntegrationRuntime.test_evaluation_not_training) ... ok
+test_failed_validation_stops_pipeline (language.tests.test_integration.IntegrationRuntime.test_failed_validation_stops_pipeline) ... ok
+test_integrated_native_clang (language.tests.test_integration.IntegrationRuntime.test_integrated_native_clang) ... ok
+test_integrated_native_gcc (language.tests.test_integration.IntegrationRuntime.test_integrated_native_gcc) ... ok
+test_optimizer_does_not_change_weights (language.tests.test_integration.IntegrationRuntime.test_optimizer_does_not_change_weights) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 13.175s
+
+OK

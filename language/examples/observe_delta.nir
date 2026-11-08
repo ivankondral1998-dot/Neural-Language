@@ -1,0 +1,18 @@
+# Change-aware sensor stream: one initial observation, then small changes.
+brain Stream {
+ senses 3
+ neurons hidden 4 relu
+ neurons output 2 linear
+ init 17
+}
+observe [0.2, -0.1, 0.5]
+predict
+tune incremental
+observe_delta 0 add 0.01
+observe_delta 2 add -0.03
+predict
+tune auto
+observe_delta 1 add 0.2
+predict
+inspect
+report "stream_report.json"

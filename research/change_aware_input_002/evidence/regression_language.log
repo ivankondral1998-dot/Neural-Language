@@ -1,0 +1,27 @@
+test_bad_index_rejected (language.tests.test_language.CompilerTests.test_bad_index_rejected) ... ok
+test_bounded_resources (language.tests.test_language.CompilerTests.test_bounded_resources) ... ok
+test_cpp_not_scripting_layer (language.tests.test_language.CompilerTests.test_cpp_not_scripting_layer) ... ok
+test_duplicate_layer_rejected (language.tests.test_language.CompilerTests.test_duplicate_layer_rejected) ... ok
+test_enormous_loop_rejected (language.tests.test_language.CompilerTests.test_enormous_loop_rejected) ... ok
+test_learning_rate_rejected (language.tests.test_language.CompilerTests.test_learning_rate_rejected) ... ok
+test_no_python_expression_in_vectors (language.tests.test_language.CompilerTests.test_no_python_expression_in_vectors) ... ok
+test_parse_minimal (language.tests.test_language.CompilerTests.test_parse_minimal) ... ok
+test_path_traversal_rejected (language.tests.test_language.CompilerTests.test_path_traversal_rejected) ... ok
+test_shape_rejected_at_compile (language.tests.test_language.CompilerTests.test_shape_rejected_at_compile) ... ok
+test_target_shape_rejected (language.tests.test_language.CompilerTests.test_target_shape_rejected) ... ok
+test_unclosed_cycle_rejected (language.tests.test_language.CompilerTests.test_unclosed_cycle_rejected) ... ok
+test_unknown_instruction_rejected (language.tests.test_language.CompilerTests.test_unknown_instruction_rejected) ... ok
+test_unknown_weight_rejected (language.tests.test_language.CompilerTests.test_unknown_weight_rejected) ... ok
+test_expect_checks_result (language.tests.test_language.NativeTests.test_expect_checks_result) ... ok
+test_failure_does_not_change_original_source (language.tests.test_language.NativeTests.test_failure_does_not_change_original_source) ... ok
+test_native_advisor_does_not_mutate_model (language.tests.test_language.NativeTests.test_native_advisor_does_not_mutate_model) ... ok
+test_real_learning_and_output (language.tests.test_language.NativeTests.test_real_learning_and_output) ... ok
+test_relu_crossing_and_snapshot (language.tests.test_language.NativeTests.test_relu_crossing_and_snapshot) ... ok
+test_sparse_vs_full_three_layer (language.tests.test_language.NativeTests.test_sparse_vs_full_three_layer) ... ok
+test_checkpoint_duplicate_rejected (language.tests.test_language.PreservationTests.test_checkpoint_duplicate_rejected) ... ok
+test_repeated_run_keeps_first_report (language.tests.test_language.PreservationTests.test_repeated_run_keeps_first_report) ... ok
+
+----------------------------------------------------------------------
+Ran 22 tests in 19.946s
+
+OK

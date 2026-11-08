@@ -1,0 +1,21 @@
+{
+  "EXPERIMENT_PRE_REGISTRATION_RU.md": "a083dc732c8036aa384ed528072a892306810ccab1a9269e7ae9dada66c570c3",
+  "HOLDOUT_PRE_REGISTRATION_RU.md": "3937774a2dbc8fffab70840310f39c56bede8e39c0e4ed4570d72abc1d26b714",
+  "RESULT_002_RU.md": "652356925079bdd8ce883e693722e61bdc333410ed0a7a761a6485e0ba0bc9f8",
+  "bench_input_change.cpp": "6c93cf57d498278a9f1a6ad66a1c0500037ac10d86e633c13132436c7acdf16c",
+  "evidence/calibration_after_gcc.csv": "d59455501b63305f80c1b94dfb8ccdf80db50a551d784eea0ddfcba40ae5184f",
+  "evidence/calibration_before_clang.csv": "c7bbd2f49a95ae9e716a333494a81a692eefbcd50708b013c4339fd90de4c854",
+  "evidence/calibration_before_gcc.csv": "15b808211a85288ddf5b6a26c47acf283a95846689f3739a7b2c398e88147ce6",
+  "evidence/clang_sanitizer.log": "be1bd753d5905d5df2b08f9b5c578fb8ce27bab6e81fa40ce0b80f69922e53bf",
+  "evidence/holdout_clang.csv": "d216adf379d6c7594ab128e1716ab19c883b8cf87ff525663d3f8b1d2b714228",
+  "evidence/holdout_gcc.csv": "b14da19f46a2d14f2bf351e55040414d6f89154e606708d41608c0e9f5e5b31f",
+  "evidence/native_end_to_end.log": "ef042a25e0fff41e17a6f6f1b64f9930b262a6b7d4018c127913636124b11672",
+  "evidence/regression_core.log": "660f3fc076ddd10fdc57b73ab9fa2c32dfd00fb479deb6d47d7294e9aa5eef40",
+  "evidence/regression_integration.log": "bccb417d6c016406e2c8bb5ac4ac0cb99fd92e80a1be7052aae800e3259f42eb",
+  "evidence/regression_language.log": "e4bd4697e685e5ab92b759d3023388d993c02a086038011e7b0796e0acdab7a4",
+  "evidence/regression_observe_delta.log": "fb8eb6fb2d6285a36cb71eab9e84739e0344d6a4206b0206cd572714f2b767e8",
+  "evidence/regression_persistent.log": "7d882fee36a4fa8ab93be2638b9adeed0911d169f41e2304adf54fe59081b38a",
+  "evidence/reproduction_summary.log": "c9d1fece3cdd6f66f8ff82241b5edb23e5445109936ec860be4b813ae90940bd",
+  "evidence/rerun_summary.json": "7db04319bb18f170f709f078f751b1b7ceab246d3988abd8a791fb164eaa718a",
+  "run_experiment.py": "c837f14d973a4ff27a0e176a7d72e19d2fa6cf32b1ce16f88ca4835b60b5e3bc"
+}
