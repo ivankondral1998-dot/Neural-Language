@@ -55,3 +55,9 @@ python3 -m unittest -q tests.test_hardening
 ## Этап NL-COMP-004 — единые эффекты и входные изменения
 
 В [docs/NEURAL_EFFECTS_CHANGES_INTEGRATION_20261108_RU.md](docs/NEURAL_EFFECTS_CHANGES_INTEGRATION_20261108_RU.md) описана проверенная интеграция `NeuralEffects/1` с `NeuralChanges/1` в компиляторе. Исправлен ошибочный отказ на `observe_delta` после `rewind` снимка с сохранённым входом; статически проверяются жизненный цикл снимков и предусловия входа. Синтаксис старых программ и их сгенерированный C++ сохранены. 73 теста PASS по отдельным группам, сквозной цикл PASS; общий монолитный прогон прерывался по лимиту времени. `main`, DAG, Android и общий `NeuralShapes` не затронуты.
+
+## NL-COMP-005 — согласование формы, эффектов и нейронных изменений
+
+Изолированная ветка `feature/typed-changes-effects-20261108` интегрирует проверку `NeuralShapes/1` с уже действующими `NeuralEffects/1` и `NeuralChanges/1`. `observe_delta` имеет типизированные индекс и числовое изменение; повреждённые формы, бюджеты, операнды и метаданные IR отвергаются **до** нативной генерации. Полный отчёт: [docs/NEURAL_SHAPES_EFFECTS_CHANGES_20261108_RU.md](docs/NEURAL_SHAPES_EFFECTS_CHANGES_20261108_RU.md). 12 новых тестов и 73 завершённых старых теста PASS отдельными группами; девять исходных C++-выходов побайтно сохранены. Это всё ещё последовательный dense-язык: DAG и Android/ARM64 не проверены.
+
+Для повторения из корня: `cd language && python3 -m unittest -q tests.test_shapes_changes_integration`; для сквозного прогона: `bash run.sh` из корня.
