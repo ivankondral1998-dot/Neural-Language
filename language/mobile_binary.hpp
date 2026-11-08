@@ -1,6 +1,7 @@
 // NLMOBIN1: explicitly little-endian, CRC32-protected compact inference checkpoint.
 // Included inside nlmobile namespace after Model is defined. No external dependencies.
 #pragma once
+
 namespace binary_detail {
 inline uint32_t u32(const unsigned char* p) {
     return uint32_t(p[0]) | uint32_t(p[1])<<8 | uint32_t(p[2])<<16 | uint32_t(p[3])<<24;
