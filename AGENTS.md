@@ -1,7 +1,15 @@
 # Instructions for successor agents — Neural Language 0.3 integration
 
-- Owner's fixed goal is the specialized Neural Language programming language for AI: source semantics, IR, compiler, native execution and neural computation. Separate helpers/agent programs are OPTIONAL research tools, not a required part of the language. Do not switch to ISKRA, UNO or another project.
-- Read README_RU.md and language/AGENTS.md, compiler.py, runtime/neural_runtime.hpp, then tests. This is a prototype; never call it superior to C++ or verified on Android.
+## MANDATORY FIRST READ — PRODUCT CHARTER (owner direction, 2026-11-08)
+
+**Before planning, changing code, or claiming progress, read [NEURAL_LANGUAGE_PRODUCT_CHARTER.md](NEURAL_LANGUAGE_PRODUCT_CHARTER.md).** The charter controls project identity, priorities, hypotheses, evidence and definition of done. Do not substitute helper tooling or familiar neural infrastructure for the core language. The primary product is **Neural Language (.nir) with demonstrable, reproducible benefits on phone workloads**; superiority on Android has **NOT** been demonstrated.
+
+**Anti-drift gate for every nontrivial task:** state the product barrier, expected language-level benefit, existing alternative/baseline, falsifiable acceptance test and evidence status. Reject or re-scope work that only creates another wrapper, model format or agent without supporting that barrier. Assistants with weights are **optional research**, not a required language component. No claims of originality or performance victory without an independently defensible comparison. The owner's explicit new decision supersedes this charter; agents may not silently redefine it.
+
+**First-read order:** root AGENTS.md → NEURAL_LANGUAGE_PRODUCT_CHARTER.md → README.md → language/AGENTS.md → current source/IR specifications and tests. Root AGENTS is not automatically read by every conceivable external tool, so README also points to the charter.
+
+- Owner's fixed goal is the specialized Neural Language programming language for AI: source semantics, IR, compiler, native execution, neural computation and measured practical advantage on phone workloads. Separate helpers/agent programs are OPTIONAL research tools, not a required part of the language. Do not switch to ISKRA, UNO or another project.
+- Read README.md and language/AGENTS.md, language/compiler.py, language/runtime/neural_runtime.hpp, then tests. This is a prototype; never call it superior to C++ or verified on Android.
 - Before modifications record exact SHA of compiler, runtime, source programs and test logs. Preserve all previous archives and source; no deletion. No GitHub Actions without explicit owner permission.
 - The compiler implements .nir commands including validate, optimize, save_model and load_model. Native executables use generated C++17, with Python as a bootstrap compiler. The optional built-in optimization heuristic only chooses a runtime strategy; it does not rewrite code or train a separate assistant.
 - Optimizer acceptance only for measured single-layer-edit workload. RUNS MUST compare equal outputs; do not market synthetic speed ratio as a general claim. Never infer inference memory/RSS from static budget.
