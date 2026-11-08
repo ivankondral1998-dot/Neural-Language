@@ -1,0 +1,17 @@
+# Verify new neural language differential self-check against full recompute.
+brain AuditNet {
+ senses 3
+ neurons h 8 relu int8
+ neurons mid 6 sigmoid
+ neurons out 2 sigmoid int8
+ init 42
+ budget 131072 1000
+}
+observe [0.4, 0.2, 0.9]
+remember before
+verify 250
+advise 60
+predict
+rewind before
+predict
+report "self_check.json"

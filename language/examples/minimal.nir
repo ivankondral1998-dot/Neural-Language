@@ -1,0 +1,15 @@
+brain Mini {
+  senses 2
+  neurons output 1 sigmoid
+  init 4
+}
+observe [1, 0]
+predict
+remember start
+weight output 0 0 add 0.5
+tune incremental
+predict
+rewind start
+predict
+inspect
+report "mini_report.json"

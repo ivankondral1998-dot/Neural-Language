@@ -1,0 +1,2 @@
+8aa23ec9551f7859bab8f8712320864c122b539cc2651f3b1c4a524f972d1ac9  /mnt/data/NEURAL_RESEARCH_AUDIT_FIX_20261108/fixed/language/compiler.py
+a25d785239f91d0e020bf47f905b0dce5848e605718c852731d6a1ca788a5cca  /mnt/data/NEURAL_RESEARCH_AUDIT_FIX_20261108/fixed/language/runtime/neural_runtime.hpp

@@ -1,0 +1,195 @@
+--- /mnt/data/NEURAL_RESEARCH_AUDIT_FIX_20261108/fixed/language/runtime/neural_runtime.hpp	2026-11-08 10:00:18.585147814 +0000
++++ /mnt/data/NEURAL_LANGUAGE_INTEGRATED_0_3/language/runtime/neural_runtime.hpp	2026-11-08 10:35:28.676745209 +0000
+@@ -257,6 +257,184 @@
+     }
+     std::cout<<"EXPECT PASS tolerance="<<tol<<"\n";
+   }
++  // Holdout evaluation is read-only: no input, weight, cache, counter or mode
++  // changes in the user's model. The author must supply genuinely new inputs.
++  void validate(const std::vector<double>& values,
++                const std::vector<double>& target,double tolerance) {
++    require(static_cast<int>(values.size())==ninput,"validation input shape mismatch");
++    require(!layers.empty() && static_cast<int>(target.size())==layers.back().out,
++            "validation target shape mismatch");
++    require(std::isfinite(tolerance) && tolerance>=0,"validation tolerance invalid");
++    for(double v:values)finite(v,"validation input");
++    for(double v:target)finite(v,"validation target");
++    Model trial=isolated_copy();
++    trial.observe(values);
++    const auto& result=trial.infer(false);
++    double sum=0.0, maximum=0.0;
++    for(size_t i=0;i<result.size();i++) {
++      require(std::isfinite(result[i]),"validation result non-finite");
++      const double delta=std::abs(result[i]-target[i]);
++      require(std::isfinite(delta),"validation difference non-finite");
++      maximum=std::max(maximum,delta);
++      sum+=delta*delta;
++      require(std::isfinite(sum),"validation loss non-finite");
++    }
++    if(maximum>tolerance)
++      throw std::runtime_error("validation failed: max_abs="+std::to_string(maximum)+
++                               " tolerance="+std::to_string(tolerance));
++    std::ostringstream ss;
++    ss<<std::setprecision(10)<<"VALIDATE PASS max_abs="<<maximum
++      <<" mse="<<(sum/result.size())<<" tolerance="<<tolerance
++      <<" original_unchanged=true";
++    std::cout<<ss.str()<<"\n";note(ss.str());
++  }
++  // Opt-in native helper invoked from .nir, not a general optimizer or LLM.
++  // Profile a deterministic *single-layer-change* workload on isolated copies.
++  // Compare FULL to the existing guarded AUTO policy, never to an obsolete
++  // per-change baseline. Accept AUTO only with repeated measurable advantage.
++  // The model's weights, topology and input remain unmodified.
++  void optimize(int rounds){
++    require(has_input,"observe before optimize");
++    require(rounds>=20 && rounds<=2000,"optimize rounds invalid");
++    infer(false);
++    size_t layer_id=0, largest=0;
++    for(size_t i=0;i<layers.size();i++)
++      if(layers[i].weight_count()>largest){largest=layers[i].weight_count();layer_id=i;}
++    struct Result{double ms;std::vector<double> trajectory;};
++    auto measure=[&](Mode selected,int trial)->Result {
++      Model m=isolated_copy();m.mode=selected;m.counters=Counters{};
++      Result result;result.trajectory.reserve(static_cast<size_t>(rounds)*layers.back().out);
++      auto started=std::chrono::steady_clock::now();
++      const int rows=m.layers[layer_id].out,cols=m.layers[layer_id].in;
++      for(int j=0;j<rounds;j++) {
++        const int row=(j*17+trial*3+1)%rows,col=(j*23+trial*7+1)%cols;
++        const double delta=(j%2 ? -1.0 : 1.0)*(m.layers[layer_id].storage ? 2*m.layers[layer_id].scale : 0.0005);
++        m.change(m.layers[layer_id].name,row,col,delta);
++        const auto& pred=m.infer(false);
++        for(double v:pred){finite(v,"optimization trajectory");result.trajectory.push_back(v);}
++      }
++      result.ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
++      return result;
++    };
++    std::vector<double> full_times,auto_times;
++    size_t checked=0;
++    for(int trial=0;trial<3;trial++){
++      // Alternate order to reduce systematic clock/cache bias.
++      Result f=trial%2 ? measure(FULL,trial) : Result{};
++      Result a=measure(AUTO,trial);
++      if(trial%2==0)f=measure(FULL,trial);
++      require(f.trajectory.size()==a.trajectory.size(),"optimize shape mismatch");
++      for(size_t j=0;j<f.trajectory.size();j++) {
++        const double bound=1e-9*(1+std::max(std::abs(f.trajectory[j]),std::abs(a.trajectory[j])));
++        require(std::abs(f.trajectory[j]-a.trajectory[j])<=bound,
++                "optimize full/auto mismatch");
++        checked++;
++      }
++      full_times.push_back(f.ms);auto_times.push_back(a.ms);
++    }
++    auto median=[](std::vector<double> x){std::sort(x.begin(),x.end());return x[x.size()/2];};
++    const double full=median(full_times),automatic=median(auto_times);
++    bool improved=automatic<full*0.85;
++    // Avoid accepting improvement driven by one noisy outlier.
++    for(size_t i=0;i<full_times.size();i++)
++      if(!(auto_times[i]<full_times[i]*0.95))improved=false;
++    mode=improved?AUTO:FULL;
++    std::ostringstream ss;
++    ss<<std::setprecision(10)<<"OPTIMIZE selected="<<(improved?"AUTO":"FULL")
++      <<" full_median_ms="<<full<<" auto_median_ms="<<automatic
++      <<" checked="<<checked<<" equivalence=PASS"
++      <<" workload=single_layer_edits"<<" weights_unchanged=true"
++      <<" note=local_profile_not_general_speed_claim";
++    std::cout<<ss.str()<<"\n";note(ss.str());
++  }
++  // Portable textual checkpoint of learned weights and edge masks.
++  // No code execution or general deserialization. Shape and numeric values
++  // are validated before updating the live model. This is NOT a security
++  // boundary against untrusted/concurrently modified filesystem objects.
++  static void safe_model_filename(const std::string& name){
++    require(!name.empty() && name!="." && name.size()<=80 &&
++            name.find('/')==std::string::npos && name.find('\\')==std::string::npos &&
++            name.find("..") == std::string::npos,"invalid local model filename");
++    for(unsigned char c:name)require(c>=32 && c!=127,"model filename contains controls");
++  }
++  void save_model(const std::string& requested)const {
++    safe_model_filename(requested);
++    std::string path=requested;
++    auto occupied=[](const std::string& name){
++      std::error_code ec;
++      auto status=std::filesystem::symlink_status(name,ec);
++      if(ec && ec!=std::errc::no_such_file_or_directory)
++        throw std::runtime_error("cannot check model output");
++      return std::filesystem::exists(status);
++    };
++    if(occupied(path)) {
++      auto dot=requested.rfind('.');
++      const auto stem=dot==std::string::npos?requested:requested.substr(0,dot);
++      const auto ext=dot==std::string::npos?std::string{}:requested.substr(dot);
++      bool found=false;
++      for(int i=1;i<10000;i++){
++        path=stem+"_"+std::to_string(i)+ext;
++        if(!occupied(path)){found=true;break;}
++      }
++      require(found,"no free model filename");
++    }
++    std::ofstream out(path,std::ios::out);
++    require(bool(out),"cannot write model");
++    out<<std::setprecision(17)<<"NLMODEL2\n"<<ninput<<' '<<layers.size()<<"\n"<<int(mode)<<"\n";
++    for(const auto& l:layers){
++      out<<l.name<<' '<<l.in<<' '<<l.out<<' '<<l.type<<' '<<l.storage<<"\n";
++      for(double v:l.b){finite(v,"saved bias");out<<v<<' ';}out<<"\n";
++      for(size_t k=0;k<l.weight_count();k++){
++        const double w=l.raw(k);finite(w,"saved weight");out<<w<<' ';
++      }
++      out<<"\n";
++      for(auto g:l.enabled){out<<int(g)<<' ';}
++      out<<"\n";
++    }
++    out<<"END\n";
++    out.flush();require(bool(out),"failed to write model");
++    std::cout<<"MODEL_SAVED "<<path<<" version="<<version<<"\n";
++  }
++  void load_model(const std::string& path){
++    safe_model_filename(path);
++    std::error_code ec;
++    auto stat=std::filesystem::symlink_status(path,ec);
++    require(!ec && std::filesystem::is_regular_file(stat),"model input must be a regular local file");
++    // Never allocate based on an untrusted count: the network shape is already
++    // specified by .nir and has its own resource bounds.
++    std::ifstream in(path);
++    require(bool(in),"cannot open model");
++    std::string marker;int input_size=0;size_t layer_count=0;
++    require(bool(in>>marker>>input_size>>layer_count) && marker=="NLMODEL2" &&
++            input_size==ninput && layer_count==layers.size(),"model header/shape mismatch");
++    int stored_mode=0;require(bool(in>>stored_mode) && stored_mode>=0 && stored_mode<=2,"invalid saved optimizer mode");
++    auto staged=layers;
++    for(size_t k=0;k<staged.size();k++) {
++      auto& l=staged[k];std::string name;int ni=0,no=0,ty=0,st=0;
++      require(bool(in>>name>>ni>>no>>ty>>st) &&
++              name==l.name && ni==l.in && no==l.out && ty==l.type && st==l.storage,
++              "model layer mismatch");
++      for(auto& b:l.b){
++        require(bool(in>>b),"truncated model bias");finite(b,"loaded bias");
++      }
++      for(size_t j=0;j<l.weight_count();j++){
++        double w=0;require(bool(in>>w),"truncated model weight");finite(w,"loaded weight");
++        l.assign_weight(j,w);
++        // Check quantized weights for exact representability after a roundtrip.
++        if(l.storage)require(std::abs(l.raw(j)-w)<=1e-14,"inexact quantized model weight");
++      }
++      l.disabled=0;
++      for(auto& enabled:l.enabled){
++        int gate=0;require(bool(in>>gate) && (gate==0||gate==1),"invalid model gate");
++        enabled=static_cast<uint8_t>(gate);
++        if(!enabled)l.disabled++;
++      }
++    }
++    std::string end;require(bool(in>>end) && end=="END","invalid model terminator");
++    in>>std::ws;require(in.peek()==std::char_traits<char>::eof(),"trailing model data");
++    layers=std::move(staged);mode=static_cast<Mode>(stored_mode);version++;cache=false;pending.clear();pending_layer=-1;delta_streak=0;
++    std::cout<<"MODEL_LOADED "<<path<<" version="<<version<<"\n";
++  }
+   void inspect()const {std::cout<<"INSPECT model="<<name<<" layers="<<layers.size()<<" weights="<<weight_count()<<" version="<<version<<" cache="<<(cache?(pending.empty()?"valid":"pending"):"invalid")<<" pending="<<pending.size()<<"\n";}
+   void note(const std::string& m){events.push_back(m);}
+   // Testing helpers use a state-only copy. Snapshots and event history must not
+@@ -427,6 +605,7 @@
+     }
+     std::ofstream f(destination,std::ios::out);require(bool(f),"cannot create report");
+     f<<"{\n  \"language\":\"Neural Language 0.2\",\n  \"model\":\""<<escape(name)<<"\",\n  \"version\":"<<version<<",\n  \"weights\":"<<weight_count()<<",\n";
++    f<<"  \"mode\":\""<<(mode==AUTO?"AUTO":(mode==FULL?"FULL":"DELTA"))<<"\",\n";
+     f<<"  \"counts\":{\"full\":"<<counters.full<<",\"delta\":"<<counters.delta<<",\"train\":"<<counters.train<<",\"changes\":"<<counters.events<<",\"auto_full\":"<<counters.auto_full<<",\"auto_delta\":"<<counters.auto_delta<<",\"blas_layers\":"<<counters.blas_layers<<"},\n";
+     f<<"  \"events\":[";for(size_t i=0;i<events.size();i++)f<<(i?",":"")<<"\""<<escape(events[i])<<"\"";f<<"]\n}\n";
+     require(bool(f),"report write failed");std::cout<<"REPORT "<<destination<<"\n";

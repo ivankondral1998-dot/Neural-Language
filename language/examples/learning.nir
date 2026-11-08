@@ -1,0 +1,43 @@
+# Neural Language 0.1. Language-specific neural syntax, compiled to a native executable.
+brain ReasonCore {
+  senses 2
+  neurons hidden 4 relu
+  neurons answer 1 sigmoid
+  init 21
+}
+
+# AND task: train the weights of a two-layer network using genuine backpropagation.
+cycle 500 {
+  observe [0, 0]
+  learn [0] rate 0.5
+  observe [0, 1]
+  learn [0] rate 0.5
+  observe [1, 0]
+  learn [0] rate 0.5
+  observe [1, 1]
+  learn [1] rate 0.5
+}
+
+inspect
+observe [0, 0]
+predict
+observe [0, 1]
+predict
+observe [1, 0]
+predict
+observe [1, 1]
+predict
+
+# Save and restore neural weights and topology; result may be reconstructed from cache.
+remember learned
+weight answer 0 0 add 0.03
+tune incremental
+predict
+edge answer 0 0 off
+predict
+rewind learned
+predict
+
+# Development assistant is a native operation of the new language.
+advise 500
+report "learning_report.json"

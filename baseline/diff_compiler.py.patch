@@ -1,0 +1,59 @@
+--- /mnt/data/NEURAL_RESEARCH_AUDIT_FIX_20261108/fixed/language/compiler.py	2026-11-08 10:03:05.240636190 +0000
++++ /mnt/data/NEURAL_LANGUAGE_INTEGRATED_0_3/language/compiler.py	2026-11-08 10:31:15.320193809 +0000
+@@ -165,6 +165,18 @@
+             if s=='inspect':out.append({'op':'inspect','line':line});continue
+             mo=re.fullmatch(r"advise\s+(\d+)",s)
+             if mo:out.append({'op':'advise','rounds':integer(mo.group(1),line,10,100000),'line':line});continue
++            mo=re.fullmatch(r"optimize\s+(\d+)",s)
++            if mo:out.append({'op':'optimize','rounds':integer(mo.group(1),line,20,2000),'line':line});continue
++            mo=re.fullmatch(r"validate\s+(\[[^\]]*\])\s+target\s+(\[[^\]]*\])\s+tolerance\s+(\S+)",s)
++            if mo:
++                tol=num(mo.group(3),line)
++                if tol<0:fail(line,"tolerance cannot be negative")
++                out.append({'op':'validate','input':vector(mo.group(1),line,senses),'target':vector(mo.group(2),line,prev),'tolerance':tol,'line':line});continue
++            mo=re.fullmatch(r"(save_model|load_model)\s+(\".*\")",s)
++            if mo:
++                fn=quoted(mo.group(2),line)
++                if '/' in fn or '\\' in fn or '..' in fn:fail(line,"model file must have a simple filename")
++                out.append({'op':mo.group(1),'filename':fn,'line':line});continue
+             mo=re.fullmatch(r"verify\s+(\d+)",s)
+             if mo:out.append({'op':'verify','rounds':integer(mo.group(1),line,2,2000),'line':line});continue
+             mo=re.fullmatch(r"expect\s+(\[[^\]]*\])\s+tolerance\s+(\S+)",s)
+@@ -196,7 +208,7 @@
+     b=ir['brain']
+     n=sum(x['size'] for x in b['neurons'])
+     weights=b['weights']
+-    counts={k:0 for k in ('observe','predict','learn','weight','edge','remember','rewind','advise','verify','inspect','report')}
++    counts={k:0 for k in ('observe','predict','learn','weight','edge','remember','rewind','advise','verify','optimize','validate','save_model','load_model','inspect','report')}
+     def scan(ops,scale=1):
+         for op in ops:
+             if op['op']=='cycle':scan(op['body'],scale*op['count'])
+@@ -213,9 +225,15 @@
+         messages.append('Sparse mutation is supported; measure before assuming a runtime advantage.')
+     if counts['verify']:
+         messages.append('Verify: deterministic full-vs-incremental differential tests on isolated state copies; does not prove correctness against an independent oracle.')
+-    if not counts['advise']:
++    if counts['optimize']:
++        messages.append('Optimize is an opt-in native runtime selection (AUTO vs FULL) on synthetic single-layer edits; it changes only mode, not weights or source. Not a general speed claim.')
++    if counts['validate']:
++        messages.append('Validate runs declared examples on isolated state copies. Held-out provenance remains the author responsibility.')
++    if counts['save_model'] or counts['load_model']:
++        messages.append('Model weights can be saved and loaded through a local versioned text format; only trusted local model files should be loaded.')
++    if not counts['advise'] and not counts['optimize']:
+         messages.append('No native advise command; strategy performance has not been measured.')
+-    else:
++    if counts['advise']:
+         messages.append('Advise compares runtime full and delta paths on synthetic edits; full may use BLAS with --blas.')
+     return {'operations':counts,'weights':weights,
+             'minimum_weight_storage_bytes_fp64':weights*8,
+@@ -256,6 +274,10 @@
+             elif o=='inspect':lines.append('brain.inspect();')
+             elif o=='advise':lines.append(f'brain.advise({x["rounds"]});')
+             elif o=='verify':lines.append(f'brain.verify({x["rounds"]});')
++            elif o=='optimize':lines.append(f'brain.optimize({x["rounds"]});')
++            elif o=='validate':lines.append(f'brain.validate({vec(x["input"])},{vec(x["target"])},{number(x["tolerance"])});')
++            elif o=='save_model':lines.append(f'brain.save_model({string(x["filename"])});')
++            elif o=='load_model':lines.append(f'brain.load_model({string(x["filename"])});')
+             elif o=='expect':lines.append(f'brain.expect({vec(x["values"])},{number(x["tolerance"])});')
+             elif o=='report':lines.append(f'brain.report({string(x["filename"])});')
+             else:raise AssertionError(o)
