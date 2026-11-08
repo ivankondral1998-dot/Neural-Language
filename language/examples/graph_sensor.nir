@@ -1,0 +1,22 @@
+# NL-006 experimental DAG: independent sensor branches and explicit skip input.
+brain GraphSensor {
+  senses 4
+  neurons left 5 relu from input
+  neurons right 3 sigmoid from input
+  neurons fused 2 linear from left right input
+  init 42
+}
+tune incremental
+observe [0.1,0.2,0.3,-0.4]
+predict
+observe_delta 1 add 0.05
+predict
+remember stable
+observe [0.2,0.2,0.1,-0.4]
+predict
+rewind stable
+predict
+learn [0.4,0.6] rate 0.01
+predict
+save_model "graph_weights.nlw"
+report "graph_report.json"

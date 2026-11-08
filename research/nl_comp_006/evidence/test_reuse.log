@@ -1,0 +1,8 @@
+test_existing_nir_syntax_and_native_report (tests.test_observe_reuse.AutomaticObserveReuse.test_existing_nir_syntax_and_native_report) ... ok
+test_independent_stress_both_compilers (tests.test_observe_reuse.AutomaticObserveReuse.test_independent_stress_both_compilers) ... ok
+test_no_new_grammar_and_existing_ir (tests.test_observe_reuse.AutomaticObserveReuse.test_no_new_grammar_and_existing_ir) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 18.079s
+
+OK

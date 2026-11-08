@@ -18,3 +18,7 @@ For each substantial change: identify the language-level barrier, source/IR cont
 ## NL-COMP-005 (typed changes/effects; isolated feature branch)
 
 Before modifying the active Neural IR compiler, read `../docs/NEURAL_SHAPES_EFFECTS_CHANGES_20261108_RU.md` and run `python3 -m unittest -q tests.test_shapes_changes_integration` from `language/`. The compiler now cross-checks `NeuralShapes/1`, `NeuralEffects/1`, and `NeuralChanges/1` before C++ emission. Preserve the nine frozen native-output SHA-256 values and runtime semantics. This is strictly sequential dense inference/training, NOT typed DAG, ARM64 measurements, or general tensor infrastructure. Do not merge experimental DAG/mobile branches without separate tests and owner-approved architecture decisions.
+
+## Experimental NL-COMP-006 DAG (isolated feature branch only)
+
+Read `../docs/NL_COMP_006_DAG_CHANGES_RU.md`. Explicit ordered graph parents and `NeuralGraph/1` are experimental. Keep legacy `.nir` C++ generation byte-for-byte; do not merge into `main` without a separate compatibility review. Graph weight edits always recover with FULL; only sparse input changes can propagate incrementally on DAG. Canonical FULL activations are mandatory for graph SGD. Never claim ARM64/Android measurements or a novel algorithm on the basis of Linux CPU benchmarks. The graph `NLMODEL3` checkpoint is not supported by the existing mobile binary converter. No GitHub Actions without owner approval.

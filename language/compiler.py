@@ -85,14 +85,29 @@ def parse(text):
         if t[0]=='senses' and len(t)==2:
             if senses is not None:fail(line,"duplicate senses")
             senses=integer(t[1],line,1,2048)
-        elif t[0]=='neurons' and len(t) in (4,5):
+        elif t[0]=='neurons' and len(t)>=4:
             nm=ident(t[1],line)
-            if nm in seen:fail(line,"duplicate neuron layer")
+            if nm=='input' or nm in seen:fail(line,"duplicate or reserved neuron layer")
+            size=integer(t[2],line,1,4096)
+            if t[3] not in ('linear','relu','sigmoid'):fail(line,"activation must be linear, relu or sigmoid")
+            rest=t[4:]
+            storage='float'
+            if rest and rest[0] in ('float','int8'):storage=rest.pop(0)
+            if rest and rest[0]!='from':fail(line,"expected storage or 'from earlier_layer ...'")
+            implicit=[neurons[-1]['name']] if neurons else ['input']
+            parents=implicit
+            if rest:
+                parents=rest[1:]
+                if not 1<=len(parents)<=8:fail(line,"parent count must be 1..8")
+                if len(set(parents))!=len(parents):fail(line,"duplicate graph parent")
+                for parent in parents:
+                    ident(parent,line)
+                    if parent!='input' and parent not in seen:
+                        fail(line,"graph parent must be input or an earlier layer: "+parent)
+            layer={'name':nm,'size':size,'activation':t[3],'storage':storage}
+            if parents!=implicit:layer['sources']=parents
+            neurons.append(layer)
             seen.add(nm)
-            storage=t[4] if len(t)==5 else 'float'
-            if storage not in ('float','int8'): fail(line,"storage must be float or int8")
-            neurons.append({'name':nm,'size':integer(t[2],line,1,4096),'activation':t[3],'storage':storage})
-            if t[3] not in ('linear','relu','sigmoid'): fail(line,"activation must be linear, relu or sigmoid")
             if len(neurons)>8:fail(line,"maximum eight neuron layers")
         elif t[0]=='budget' and len(t)==3:
             if budget is not None: fail(line,"duplicate budget")
@@ -101,26 +116,40 @@ def parse(text):
         else:fail(line,"invalid brain declaration: "+s)
     else:raise CompileError("brain block missing }")
     if senses is None or not neurons: raise CompileError("brain needs senses and at least one neurons layer")
-    shapes={};prev=senses;total=0
-    for n in neurons:
-        total+=prev*n['size']; shapes[n['name']]=(n['size'],prev);prev=n['size']
+    # Acyclic feed-forward graph: parents must precede consumers.
+    # Preserve legacy IR shape for sequential-only programs byte-for-byte.
+    dimensions={'input':senses};shapes={};prev=senses;total=0
+    weight_bytes=0;storage_bytes=8*senses;macs=0;graph=False
+    for index,n in enumerate(neurons):
+        implicit=[neurons[index-1]['name']] if index else ['input']
+        parents=n.get('sources',implicit)
+        if parents!=implicit:graph=True
+        width=sum(dimensions[parent] for parent in parents)
+        total+=width*n['size'];shapes[n['name']]=(n['size'],width)
+        weight_width=1 if n['storage']=='int8' else 8
+        weight_bytes+=width*n['size']*weight_width
+        storage_bytes+=width*n['size']*(weight_width+1)+n['size']*(8+16)
+        macs+=width*n['size']
+        dimensions[n['name']]=n['size'];prev=n['size']
     if total>4000000:raise CompileError("brain exceeds total weight budget")
-    # Static resident numeric tensors only: one owning weight array per layer,
-    # gate bytes, biases, cached preactivations/activations, and input.
-    # This excludes vectors/maps/allocator overhead, checkpoints, advise clones,
-    # pending change queues and temporary training gradients. Not a process RSS cap.
-    weight_bytes=0; storage_bytes=8*senses; macs=0; prev=senses
-    for n in neurons:
-        width=1 if n['storage']=='int8' else 8
-        weight_bytes += prev*n['size']*width
-        storage_bytes += prev*n['size']*(width+1) + n['size']*(8+16)
-        macs += prev*n['size']
-        prev=n['size']
+    if graph:
+        reachable=set()
+        layers_by_name={n['name']:n for n in neurons}
+        def reach(name):
+            if name=='input' or name in reachable:return
+            reachable.add(name)
+            i=next(i for i,n in enumerate(neurons) if n['name']==name)
+            defaults=[neurons[i-1]['name']] if i else ['input']
+            for source in layers_by_name[name].get('sources',defaults):reach(source)
+        reach(neurons[-1]['name'])
+        dead=[n['name'] for n in neurons if n['name'] not in reachable]
+        if dead:raise CompileError('graph layers disconnected from output: '+', '.join(dead))
     if budget is not None and (storage_bytes>budget[0] or macs>budget[1]):
         raise CompileError(f"budget exceeded: {storage_bytes} resident tensor bytes / {macs} forward MACs > {budget[0]} / {budget[1]}")
     model={'name':name,'senses':senses,'neurons':neurons,'init':seed,'weights':total,
            'weight_bytes':weight_bytes,'storage_bytes':storage_bytes,
            'macs':macs,'budget':budget,'budget_scope':'resident numeric tensors and forward MACs only'}
+    if graph:model['graph']=True
     def ops(nested=False,depth=0):
         nonlocal i
         if depth>8:raise CompileError("cycle nesting limit exceeded")
@@ -204,11 +233,18 @@ def parse(text):
             if n>1000000:raise CompileError("program exceeds one million operations")
         return n
     steps=cost(program)
+    if graph:
+        def reject_graph_bench(items):
+            for op in items:
+                if op['op']=='cycle':reject_graph_bench(op['body'])
+                elif op['op'] in ('advise','verify','optimize'):
+                    fail(op['line'],op['op']+' not implemented for DAG graphs')
+        reject_graph_bench(program)
     if not program: raise CompileError("brain needs executable instructions")
     # Shared state/effect semantics, including restored input in snapshots.
     # The NeuralEffects/1 metadata is additive and does not change native code.
     effects=validate_semantics(program)
-    result={'ir_version':'NeuralIR/0.2','brain':model,'operations':program,
+    result={'ir_version':'NeuralIR/0.4-graph' if graph else 'NeuralIR/0.2','brain':model,'operations':program,
             'estimated_max_operations':steps,'semantic_contract':effects}
     # Additive semantic IR metadata; never silently claim general DAG support.
     def collect_deltas(items):
@@ -220,15 +256,23 @@ def parse(text):
     deltas=collect_deltas(program)
     if deltas:
         result['neural_changes']={
-            'contract':'NeuralChanges/1','topology':'sequential_dense_only',
+            'contract':'NeuralChanges/1','topology':'dag_dense' if graph else 'sequential_dense_only',
             'input_width':senses,
-            'dependencies':[{'source':'input' if k==0 else neurons[k-1]['name'],
-                             'target':n['name']} for k,n in enumerate(neurons)],
+            'dependencies':[{'source':parent,'target':n['name']}
+                            for k,n in enumerate(neurons)
+                            for parent in n.get('sources',[neurons[k-1]['name']] if k else ['input'])],
             'operation':'observe_delta','effect':{'reads':['input','weights','cache'],
                 'writes':['input','cache'],'requires_observe':True},
             'occurrences':[{'line':x['line'],'index':x['index']} for x in deltas],
             'semantic':'input[index] += delta, then mathematically full forward at next use; '
                        'incremental evaluation allowed within numerical tolerance'
+        }
+    if graph:
+        result['graph_contract']={
+            'version':'NeuralGraph/1','output':neurons[-1]['name'],
+            'edges':[{'source':src,'target':n['name']} for k,n in enumerate(neurons)
+                     for src in n.get('sources',[neurons[k-1]['name']] if k else ['input'])],
+            'scope':'ordered acyclic dense layers; inputs concatenated in listed parent order',
         }
     result['shape_contract']=verify_typed_ir(result)
     verify_neural_changes(result)
@@ -393,8 +437,8 @@ def verify_typed_ir(ir):
             unicodedata.category(c) in ('Zl','Zp') for c in value),
             label + ' invalid filename characters')
 
-    require(type(ir) is dict and ir.get('ir_version') == 'NeuralIR/0.2',
-            'unsupported IR version (expected NeuralIR/0.2)')
+    require(type(ir) is dict and ir.get('ir_version') in ('NeuralIR/0.2','NeuralIR/0.4-graph'),
+            'unsupported IR version')
     brain=ir.get('brain')
     require(type(brain) is dict, 'brain must be an object')
     identifier(brain.get('name'), 'brain name')
@@ -403,7 +447,7 @@ def verify_typed_ir(ir):
     layers=brain.get('neurons')
     require(type(layers) is list and 1 <= len(layers) <= 8,
             'neurons must contain 1..8 sequential layers')
-    shapes={};declarations=[];prev=senses;total=0;weight_bytes=0;storage_bytes=8*senses
+    shapes={};dimensions={'input':senses};declarations=[];prev=senses;total=0;weight_bytes=0;storage_bytes=8*senses;graph=False
     for index,layer in enumerate(layers):
         require(type(layer) is dict, f'layer {index} must be an object')
         name=identifier(layer.get('name'), f'layer {index} name')
@@ -415,19 +459,46 @@ def verify_typed_ir(ir):
         storage=layer.get('storage','float')
         require(type(storage) is str and storage in ('float','int8'),
                 f'layer {index} invalid storage')
-        shapes[name]=(size,prev)
-        total+=prev*size
+        implicit=[layers[index-1]['name']] if index else ['input']
+        parents=layer.get('sources',implicit)
+        require(type(parents) is list and 1<=len(parents)<=8,'graph parents invalid')
+        require(len(set(str(x) for x in parents))==len(parents),'duplicate graph parent')
+        for parent in parents:
+            identifier(parent,'graph parent')
+            require(parent in dimensions,'graph parent must precede consumer')
+        if parents!=implicit:graph=True
+        width_in=sum(dimensions[parent] for parent in parents)
+        shapes[name]=(size,width_in)
+        total+=width_in*size
         width=1 if storage=='int8' else 8
-        weight_bytes+=prev*size*width
-        storage_bytes+=prev*size*(width+1)+size*(8+16)
-        declarations.append({
+        weight_bytes+=width_in*size*width
+        storage_bytes+=width_in*size*(width+1)+size*(8+16)
+        declaration={
             'name':name,
-            'input':{'dtype':'f64','shape':[prev]},
+            'input':{'dtype':'f64','shape':[width_in]},
             'output':{'dtype':'f64','shape':[size]},
-            'weight_shape':[size,prev],
+            'weight_shape':[size,width_in],
             'weight_storage':storage,
-        })
+        }
+        if graph:declaration['sources']=list(parents)
+        declarations.append(declaration)
+        dimensions[name]=size
         prev=size
+    if graph:
+        for i,d in enumerate(declarations):
+            if 'sources' not in d:
+                d['sources']=list(layers[i].get('sources',[layers[i-1]['name']] if i else ['input']))
+        reachable=set()
+        def visit(name):
+            if name=='input' or name in reachable:return
+            reachable.add(name)
+            idx=next(i for i,d in enumerate(declarations) if d['name']==name)
+            for parent in declarations[idx]['sources']:visit(parent)
+        visit(layers[-1]['name'])
+        require(len(reachable)==len(layers),'unreachable graph layer')
+    require(ir['ir_version']==('NeuralIR/0.4-graph' if graph else 'NeuralIR/0.2'),
+            'graph version mismatch')
+    require(brain.get('graph',False) is graph,'graph flag mismatch')
     require(total <= 4000000,'model exceeds maximum weights')
     for label,actual,calculated in (
         ('weights',brain.get('weights'),total),
@@ -524,10 +595,22 @@ def verify_typed_ir(ir):
         'output':{'dtype':'f64','shape':[prev]},
         'layers':declarations,
         'operation_signatures':{k:signatures[k] for k in sorted(signatures)},
-        'scope':'sequential dense layers; rank-1 f64 input/output; no general tensor or DAG support',
+        'scope':'topologically ordered dense DAG; rank-1 f64; no general tensor support' if graph
+                else 'sequential dense layers; rank-1 f64 input/output; no general tensor or DAG support',
     }
     if 'shape_contract' in ir:
         require(ir['shape_contract']==shape_contract,'shape contract mismatch')
+    if graph:
+        graph_contract={
+            'version':'NeuralGraph/1',
+            'output':layers[-1]['name'],
+            'edges':[{'source':src,'target':d['name']} for d in declarations for src in d['sources']],
+            'scope':'ordered acyclic dense layers; inputs concatenated in listed parent order',
+        }
+        if ir.get('graph_contract')!=graph_contract:
+            require(False,'graph contract mismatch')
+    else:
+        require('graph_contract' not in ir,'sequential IR cannot carry graph contract')
     return shape_contract
 
 
@@ -572,14 +655,14 @@ def verify_neural_changes(ir):
     if not occurrences:
         if meta is not None:raise CompileError('NeuralChanges: orphan metadata')
         return
-    if not isinstance(meta,dict) or meta.get('contract')!='NeuralChanges/1' or meta.get('topology')!='sequential_dense_only':
+    if not isinstance(meta,dict) or meta.get('contract')!='NeuralChanges/1' or meta.get('topology')!=('dag_dense' if brain.get('graph') else 'sequential_dense_only'):
         raise CompileError('NeuralChanges: contract missing or invalid')
     deps=[]
     for k,layer in enumerate(neurons):
         if not isinstance(layer,dict) or type(layer.get('name')) is not str:
             raise CompileError('NeuralChanges: invalid layer')
-        deps.append({'source':'input' if k==0 else neurons[k-1]['name'],
-                     'target':layer['name']})
+        for parent in layer.get('sources',[neurons[k-1]['name']] if k else ['input']):
+            deps.append({'source':parent,'target':layer['name']})
     if meta.get('dependencies')!=deps or meta.get('occurrences')!=occurrences or meta.get('input_width')!=senses:
         raise CompileError('NeuralChanges: corrupted dependencies or occurrences')
     if meta.get('operation')!='observe_delta' or meta.get('effect')!={
@@ -645,7 +728,12 @@ def emit(ir):
     for k,l in enumerate(b['neurons']):
         typ={'linear':0,'relu':1,'sigmoid':2}[l['activation']]
         store=1 if l.get('storage')=='int8' else 0
-        lines.append(f'brain.layer({string(l["name"])},{l["size"]},{typ},static_cast<uint32_t>({b["init"]}ULL+{k}*31337ULL),{store});')
+        if b.get('graph'):
+            sources=l.get('sources',[b['neurons'][k-1]['name']] if k else ['input'])
+            srcs='std::vector<std::string>{'+','.join(string(p) for p in sources)+'}'
+            lines.append(f'brain.layer_sources({string(l["name"])},{l["size"]},{typ},static_cast<uint32_t>({b["init"]}ULL+{k}*31337ULL),{store},{srcs});')
+        else:
+            lines.append(f'brain.layer({string(l["name"])},{l["size"]},{typ},static_cast<uint32_t>({b["init"]}ULL+{k}*31337ULL),{store});')
     def block(ops,depth=0):
         for j,x in enumerate(ops):
             o=x['op']

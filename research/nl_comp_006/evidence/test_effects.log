@@ -1,0 +1,14 @@
+test_duplicate_and_loop_checkpoints_rejected (tests.test_effects_changes_integration.EffectContractTests.test_duplicate_and_loop_checkpoints_rejected) ... ok
+test_effect_metadata_checked_prior_to_native_emit (tests.test_effects_changes_integration.EffectContractTests.test_effect_metadata_checked_prior_to_native_emit) ... ok
+test_no_cpp_codegen_change_for_previous_valid_program (tests.test_effects_changes_integration.EffectContractTests.test_no_cpp_codegen_change_for_previous_valid_program) ... ok
+test_restored_snapshot_native_matches_full_oracle (tests.test_effects_changes_integration.EffectContractTests.test_restored_snapshot_native_matches_full_oracle) ... ok
+test_restoring_input_snapshot_enables_delta (tests.test_effects_changes_integration.EffectContractTests.test_restoring_input_snapshot_enables_delta) ... ok
+test_restoring_unbound_snapshot_rejects_delta (tests.test_effects_changes_integration.EffectContractTests.test_restoring_unbound_snapshot_rejects_delta) ... ok
+test_rewinding_missing_checkpoint_rejected (tests.test_effects_changes_integration.EffectContractTests.test_rewinding_missing_checkpoint_rejected) ... ok
+test_second_iteration_after_restore_unbound_snapshot_rejected (tests.test_effects_changes_integration.EffectContractTests.test_second_iteration_after_restore_unbound_snapshot_rejected) ... ok
+test_second_iteration_with_bound_snapshot_accepted (tests.test_effects_changes_integration.EffectContractTests.test_second_iteration_with_bound_snapshot_accepted) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 10.552s
+
+OK
