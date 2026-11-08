@@ -1,5 +1,6 @@
 """NeuralEffects/1 + NeuralChanges/1 integration against actual native programs."""
 import copy
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -71,9 +72,24 @@ class EffectContractTests(unittest.TestCase):
         self.assertIsInstance(analyze_ir(legacy),dict)
 
     def test_no_cpp_codegen_change_for_previous_valid_program(self):
-        text=HEAD+'observe [0.2,0.3]\npredict\n'
-        self.assertNotIn('semantic_contract',emit(parse(text)))
-        self.assertEqual(emit(parse(text)),emit(parse(text)))
+        # Frozen baseline hashes from the NL-COMP-003 compiler, independently
+        # generated before this integration. This protects the native output
+        # for all nine shipped language samples, not just self-consistency.
+        golden={
+            'implicit_observe.nir':'13378142548e21a7a07f837cf69352e0e715e86f0f79b7a9e9421c4e08b4f46e',
+            'inference.nir':'daca90366ddd4930a91d098ab6dc4d0fe3333c241f1169db14d2b41c3cd8d781',
+            'integrated.nir':'fc3e3f055f33124e8ae2592c5ce7dd8a9508e91450bd1b5d18e60f9a2509275b',
+            'learning.nir':'13fddbdd25a375862436ea784a39b26d280c896a22838877eca730937c73f76b',
+            'minimal.nir':'b06ae3bd2706f797bf8f760574c4f99f4b967277beeafb132503eb917da01da4',
+            'observe_delta.nir':'56ef8ab7c6b2fb730b76af46603aec03dd19424856971f5197a336b833d4a369',
+            'optimization_profile.nir':'5dfcf57100720cbe579031f7e39f1cdb4cfeee5e10aefa48808107afa2486071',
+            'performance.nir':'05b55babb03a17b429931abe91e0cc7cc17be6bc39e4afa301b395ac3d87d96c',
+            'self_check.nir':'c647a62891c5d1da7f775df0c189db5526d96544b98d0c4dcca11d12e5520897',
+        }
+        for filename,expected in golden.items():
+            with self.subTest(example=filename):
+                source=(ROOT/'examples'/filename).read_text(encoding='utf-8')
+                self.assertEqual(hashlib.sha256(emit(parse(source)).encode()).hexdigest(),expected)
 
     @unittest.skipUnless(shutil.which('g++') and shutil.which('clang++'),'requires GCC and Clang')
     def test_restored_snapshot_native_matches_full_oracle(self):
