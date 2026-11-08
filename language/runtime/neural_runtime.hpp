@@ -1,6 +1,7 @@
 #pragma once
 // Neural Language 0.2 adaptive native runtime, C++17. No Python interpreter in execution path.
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -78,7 +79,9 @@ public:
   std::map<std::string,Snapshot> saved;
   struct Pending {int row, col;double difference;};
   std::vector<Pending> pending;
-  struct InputPending {int col;double difference;};
+  // At most one pending record per coordinate. original is the last value
+  // used by the cached forward pass, not a sum of rounded incremental edits.
+  struct InputPending {int col;double original;};
   std::vector<InputPending> pending_input;
   int pending_layer=-1;
   size_t delta_streak=0;
@@ -97,7 +100,73 @@ public:
     layers.push_back(std::move(l));
     z.resize(layers.size());a.resize(layers.size());
   }
-  void observe(std::vector<double> x){require((int)x.size()==ninput,"input shape mismatch");for(double v:x)finite(v,"input");if(!has_input||x!=input) {cache=false;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;} input=std::move(x);has_input=true;}
+  // Stage a coordinate just once per evaluation epoch, preserving its value
+  // from the previous cached forward pass. This avoids duplicate work for
+  // repeated sensor samples and captures net-zero changes without drift.
+  void stage_input(int col,double old_value){
+    for(const auto& edit:pending_input)if(edit.col==col)return;
+    pending_input.push_back({col,old_value});
+  }
+  // Existing language-level full observe is semantically a replacement.
+  // The runtime may transparently reuse cached work when only some values
+  // differ. Old programs retain the same source syntax and output values.
+  void observe(std::vector<double> x){
+    require((int)x.size()==ninput,"input shape mismatch");
+    for(double v:x)finite(v,"input");
+    if(!has_input){input=std::move(x);has_input=true;return;}
+    if(x==input)return; // literal no-op: preserve cache and counters
+    if(mode==FULL || !cache || !pending.empty() || layers.empty()){
+      cache=false;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;
+      input=std::move(x);return;
+    }
+    // For small networks, scanning and bookkeeping a *full* vector can cost
+    // more than a BLAS forward pass. Keep explicit observe_delta available;
+    // automatic full-vector detection is conservatively limited to larger
+    // workloads until device-specific cost models are measured on ARM64.
+    if(mode==AUTO && full_cost()<65536){
+      cache=false;pending_input.clear();delta_streak=0;
+      input=std::move(x);return;
+    }
+    // In the already-cached epoch, collect only touched coordinates.
+    // Repeated observations of the same coordinate do not allocate an
+    // unbounded event list. The cost model decides AUTO vs FULL at infer().
+    // Bounded stack bitmap gives O(input_width + pending_count) staging.
+    std::array<uint8_t,2048> staged{};
+    for(const auto& edit:pending_input)staged[static_cast<size_t>(edit.col)]=1;
+    // AUTO's existing cost model would select a full pass once sufficiently
+    // many input coordinates changed. Stop recording events at that point,
+    // rather than allocating and discarding them in flush_input_pending().
+    // The coefficients and acceptance threshold are identical to flush.
+    size_t largest_useful=static_cast<size_t>(ninput);
+    if(mode==AUTO){
+      const double first_out=layers.front().out;
+      double fixed_cost=2.0*first_out;
+      for(size_t k=1;k<layers.size();k++)
+        fixed_cost+=double(layers[k-1].out)*layers[k].out;
+      const double full=double(full_cost())*(has_blas?0.35:0.85)+256.0*layers.size();
+      const double available=full*0.70-fixed_cost;
+      const double raw_cap=available/(14.0*first_out);
+      largest_useful=full_cost()<1024 || delta_streak>=128 || raw_cap<0.0
+                    ? 0 : std::min(static_cast<size_t>(ninput),static_cast<size_t>(raw_cap));
+      if(pending_input.size()>largest_useful){
+        cache=false;pending_input.clear();delta_streak=0;
+        input=std::move(x);return;
+      }
+    }
+    for(int col=0;col<ninput;++col){
+      const size_t ix=static_cast<size_t>(col);
+      if(x[ix]!=input[ix] && !staged[ix]){
+        if(pending_input.size()>=largest_useful){
+          // Already known to be more expensive than a full pass.
+          cache=false;pending_input.clear();delta_streak=0;
+          input=std::move(x);return;
+        }
+        pending_input.push_back({col,input[ix]});
+        staged[ix]=1;
+      }
+    }
+    input=std::move(x);
+  }
   // A new language-level input patch. An existing observe is required.
   // Consecutive changes are staged and propagated as a single batch on demand.
   void change_input(int col,double requested){
@@ -112,8 +181,7 @@ public:
     version++;counters.input_events++;
     if(actual==0){if(cache && pending_input.empty())cache_version=version;return;}
     if(mode==FULL || !cache){cache=false;pending_input.clear();delta_streak=0;return;}
-    pending_input.push_back({col,actual});
-    if(pending_input.size()>4096){cache=false;pending_input.clear();delta_streak=0;}
+    stage_input(col,old);
   }
   // All full passes use the same FP64 weights, activation semantics and mask.
   // A BLAS matrix-vector multiply is used only when every edge is enabled.
@@ -203,15 +271,26 @@ public:
     // Calibrated conservatively from a separate x86-64 OpenBLAS sweep:
     // column-wise weight access is strided in row-major storage and much
     // costlier per MAC than contiguous full GEMV. This is not a mobile model.
-    double estimate=14.0*pending_input.size()*first.out+2.0*first.out;
+    // Recompute each net change relative to the last cached input, not
+    // from summed FP64 edit deltas; repeated edits may cancel exactly.
+    std::vector<InputPending> effective;
+    effective.reserve(pending_input.size());
+    for(const auto& edit:pending_input){
+      const double net=input[static_cast<size_t>(edit.col)]-edit.original;
+      if(net!=0.0)effective.push_back({edit.col,net});
+    }
+    if(effective.empty()){
+      pending_input.clear();cache_version=version;return;
+    }
+    double estimate=14.0*effective.size()*first.out+2.0*first.out;
     for(size_t k=1;k<layers.size();k++)estimate+=double(layers[k-1].out)*layers[k].out;
     const bool choose=(mode==DELTA || (mode==AUTO && full_cost()>=1024 && estimate<full*0.70))
                  && delta_streak<128;
     if(!choose){if(mode==AUTO){counters.auto_full++;counters.input_auto_full++;}forward();return;}
     std::vector<double> change(first.out,0.0);
-    for(const auto& p:pending_input)
+    for(const auto& p:effective)
       for(int r=0;r<first.out;r++)
-        change[r]+=first.effective(static_cast<size_t>(r)*first.in+p.col)*p.difference;
+        change[r]+=first.effective(static_cast<size_t>(r)*first.in+p.col)*p.original;
     std::vector<int> active;
     for(int r=0;r<first.out;r++){
       if(change[r]==0.0)continue;
@@ -281,7 +360,11 @@ public:
   void learn(const std::vector<double>& target,double rate){
     require(!layers.empty(),"empty network");require(has_input,"observe before learn");require((int)target.size()==layers.back().out,"target shape mismatch");
     require(rate>0&&rate<=1,"learning rate out of range");for(double v:target)finite(v,"target");
-    infer(false);
+    // Training must use the canonical FULL activations: mathematically
+    // equivalent incremental paths can differ by FP64 rounding, and those
+    // differences otherwise alter subsequent SGD weight updates. Inference
+    // may reuse cached work; learning re-evaluates exact current state.
+    forward();
     std::vector<std::vector<double>> grad(layers.size());
     size_t last=layers.size()-1;
     grad[last].resize(layers[last].out);
