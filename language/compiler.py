@@ -77,7 +77,7 @@ def parse(text):
     m=re.fullmatch(r"brain\s+(\w+)\s*\{",s)
     if not m: fail(lineno,"source must start with brain Name {")
     name=ident(m.group(1),lineno)
-    senses=None; neurons=[]; seed=11; seen=set(); budget=None
+    senses=None; neurons=[]; seed=11; init_declared=False; seen=set(); budget=None
     while i<len(lines):
         line,s=take()
         if s=='}':break
@@ -97,7 +97,10 @@ def parse(text):
         elif t[0]=='budget' and len(t)==3:
             if budget is not None: fail(line,"duplicate budget")
             budget=(integer(t[1],line,1,1<<30), integer(t[2],line,1,1<<30))
-        elif t[0]=='init' and len(t)==2:seed=integer(t[1],line,0,4294967295)
+        elif t[0]=='init' and len(t)==2:
+            if init_declared:fail(line,"duplicate init")
+            seed=integer(t[1],line,0,4294967295)
+            init_declared=True
         else:fail(line,"invalid brain declaration: "+s)
     else:raise CompileError("brain block missing }")
     if senses is None or not neurons: raise CompileError("brain needs senses and at least one neurons layer")
