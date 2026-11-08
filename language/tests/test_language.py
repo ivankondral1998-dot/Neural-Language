@@ -171,9 +171,13 @@ expect [0] tolerance 1e-12
         src=PREAMBLE+'predict'
         p=self.td/'orig.nir';p.write_text(src)
         old=p.read_bytes()
-        r=run_native(src,self.td,'runtimefail')
+        # This invalid source must now fail BEFORE C++ generation, not at runtime.
+        out=self.td/'runtimefail'
+        r=subprocess.run([sys.executable,str(ROOT/'compiler.py'),str(p),'-o',str(out)],
+                         capture_output=True,text=True)
         self.assertNotEqual(r.returncode,0)
         self.assertIn('observe',r.stderr)
+        self.assertFalse(out.exists())
         self.assertEqual(p.read_bytes(),old)
 
 if __name__=='__main__':unittest.main(verbosity=2)

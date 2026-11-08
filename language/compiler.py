@@ -204,7 +204,48 @@ def parse(text):
         return n
     steps=cost(program)
     if not program: raise CompileError("brain needs executable instructions")
+    validate_input_state(program)
     return {'ir_version':'NeuralIR/0.2','brain':model,'operations':program,'estimated_max_operations':steps}
+
+
+def validate_input_state(program):
+    """Check the input-state precondition of native operations before code generation.
+
+    This pass reads normalized Neural IR operations; it neither executes them nor
+    changes the IR. Current .nir has only deterministic sequential statements and
+    positive-count cycles, so one pass through a loop body captures the required
+    input-state precondition. Runtime continues to validate model files, math and
+    dynamically missing checkpoint names.
+
+    State: "observed" means a current input exists in the native Model. A
+    checkpoint snapshots precisely that boolean alongside input and weights.
+    Read-only validate works on an isolated copy and must not produce an input.
+    Loading model weights does not change the current input state.
+    """
+    snapshots = {}
+    needs_input = frozenset({'predict', 'learn', 'expect', 'advise',
+                             'verify', 'optimize'})
+
+    def walk(operations, observed):
+        for operation in operations:
+            kind = operation['op']
+            if kind == 'cycle':
+                # The loop has at least one iteration by the parser contract.
+                observed = walk(operation['body'], observed)
+            elif kind == 'observe':
+                observed = True
+            elif kind == 'remember':
+                # Repeated checkpoints remain a runtime error (unchanged ABI).
+                snapshots.setdefault(operation['name'], observed)
+            elif kind == 'rewind':
+                # Unknown labels remain runtime errors, but we must not assume
+                # that a failing restore makes an input available.
+                observed = snapshots.get(operation['name'], False)
+            elif kind in needs_input and not observed:
+                fail(operation['line'], f"{kind} requires observe before use (input state absent)")
+        return observed
+
+    walk(program, False)
 
 def analyze_ir(ir):
     """Deterministic compiler-side developer assistant; no external model."""
