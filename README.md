@@ -51,3 +51,7 @@ python3 -m unittest -q tests.test_hardening
 ## Neural IR — проверка эффектов (исследовательская ветка)
 
 В `fix/neural-ir-effects-20261108` добавлена **ограниченная** статическая проверка состояния ввода и уникальности/жизненного цикла снимков, а также машиночитаемая метаинформация `NeuralEffects/1` в Neural IR. Кодогенерация повторно сверяет этот контракт. См. [`docs/NEURAL_IR_EFFECTS_CONTRACT_RU.md`](docs/NEURAL_IR_EFFECTS_CONTRACT_RU.md) и [`docs/ENGINEERING_RESULT_20261108_RU.md`](docs/ENGINEERING_RESULT_20261108_RU.md). Это не полный типизированный IR и не новая оптимизация нейронов; существующий C++ runtime не менялся.
+
+## Neural IR: проверка типов и форм (изолированная ветка)
+
+Ветка [`fix/neural-ir-shapes-20261108`](https://github.com/ivankondral1998-dot/Neural-Language/tree/fix/neural-ir-shapes-20261108) добавляет узкий контракт `NeuralShapes/1` для действующих dense-сетей, проверку изменений IR перед генерацией C++ и отрицательные тесты. Синтаксис `.nir`, нейронное C++-ядро и форматы весов не изменены. См. [`docs/NEURAL_IR_SHAPES_CONTRACT_RU.md`](docs/NEURAL_IR_SHAPES_CONTRACT_RU.md), [`docs/RELEASE_STATUS_TYPED_IR_20261108_RU.md`](docs/RELEASE_STATUS_TYPED_IR_20261108_RU.md), [`research/CROSS_PROJECT_RELEVANCE_TYPED_IR_20261108_RU.md`](research/CROSS_PROJECT_RELEVANCE_TYPED_IR_20261108_RU.md). Это не универсальная типизированная тензорная IR и не Android-версия. `main` остаётся неизменной.

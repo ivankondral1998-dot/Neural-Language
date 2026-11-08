@@ -21,3 +21,10 @@
 - The `NeuralEffects/1` semantic contract is additive metadata: not a full IR type system, optimizer or runtime security guarantee.
 - Preserve C++ runtime checks; compiler-side rejection of invalid checkpoint usage does not replace runtime guards.
 - Do not merge unrelated 0.4 DAG, 0.5 assistant, ten-worker experiments or code from other user projects into the foundation without a separate technically justified change.
+
+## Typed Neural IR revision (2026-11-08, isolated branch)
+
+- Read `docs/NEURAL_IR_SHAPES_CONTRACT_RU.md`. `NeuralShapes/1` is an additive, narrow shape/type contract for sequential dense networks, NOT a general tensor language, optimizer or DAG.
+- `emit()` and `analyze_ir()` must reject mutated/invalid Neural IR before generating native code or reporting measurements. Old IR without the new metadata must still be structurally revalidated.
+- Tests must preserve old native C++ output for existing valid `.nir` programs and independently check matrix dimensions and budget arithmetic.
+- Research summaries from UNO, Jarvis, PMB, CELL and other repositories are conceptual only. No code, model, weights or policy from other projects is part of Neural Language.

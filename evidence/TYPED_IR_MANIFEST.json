@@ -1,0 +1,73 @@
+{
+  "project": "Neural Language",
+  "base_branch": "fix/neural-ir-effects-20261108",
+  "base_head": "1bec6b678709c8bdb2ca6232779fd4669b311d23",
+  "scope": "Sequential NeuralIR/0.2 type/shape verification before C++ emission; additive NeuralShapes/1 metadata",
+  "runtime_unchanged_git_blob": "ee71cdab32b248814aa23f26318130bd155c824f",
+  "test_groups": [
+    {
+      "file": "compile_semantics_suite_final.log",
+      "count": 75,
+      "result": "PASS",
+      "sha256": "8342d143b747e020a6b531943c732f2f4a33ae4b12da1334090c09ca82b4c5cc"
+    },
+    {
+      "file": "hardening_suite.log",
+      "count": 8,
+      "result": "PASS",
+      "sha256": "bb66488b5fc3657d7c77dde9ce67399dd27cfaf4fb3a7ae84a0c545fd69cb4c2"
+    },
+    {
+      "file": "integration_suite.log",
+      "count": 14,
+      "result": "PASS",
+      "sha256": "65507613c966791d4d6f3b53c13bdca0c12433f4472aa2519d5d902e4ce480fb"
+    },
+    {
+      "file": "numerics_static_suite.log",
+      "count": 6,
+      "result": "PASS",
+      "sha256": "7b2a27cb05fa856cc7d6f32239366ece90b0604e25421cb1e0d205ce1b16cb7f"
+    },
+    {
+      "file": "native_verifier_a.log",
+      "count": 2,
+      "result": "PASS",
+      "sha256": "c0b5d5356170b61faa44a74632ba5b97474d43aa0e0f8a59ff08cfc848bf2df8"
+    },
+    {
+      "file": "native_mutation_guard.log",
+      "count": 1,
+      "result": "PASS",
+      "sha256": "1108c451055508582647f3e87de056b566aa4a13d36e5cb8b99b777ae5240447"
+    },
+    {
+      "file": "native_int8_regression.log",
+      "count": 1,
+      "result": "PASS",
+      "sha256": "e96ceb5ffab90958a762189dd3fb249f565ab182d3fdfe128a149ac1ecc7e37f"
+    }
+  ],
+  "total_passed": 107,
+  "compatibility": {
+    "old_programs": 7,
+    "same_old_ir_fields": true,
+    "identical_generated_cpp": true,
+    "details": "compat_7_examples_typed_ir.json"
+  },
+  "native_end_to_end": {
+    "gcc": "PASS",
+    "clang": "PASS",
+    "independent_python_model_oracle": "PASS"
+  },
+  "host_environment": {
+    "python": "3.13.5",
+    "system": "Linux",
+    "machine": "x86_64"
+  },
+  "excluded_evidence": [
+    "prior combined numeric suite timed out: not counted as PASS",
+    "no Android/ARM64/device verification"
+  ],
+  "non_reuse": "No code from any other user project copied into implementation."
+}

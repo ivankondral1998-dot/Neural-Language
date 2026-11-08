@@ -55,7 +55,7 @@ class StaticInputStateTests(unittest.TestCase):
     def test_ir_contains_explicit_semantic_contract(self):
         ir=parse(BRAIN+'observe [0]\npredict\n')
         self.assertEqual(ir['ir_version'],'NeuralIR/0.2')
-        self.assertEqual(set(ir),{'ir_version','brain','operations','estimated_max_operations','semantic_contract'})
+        self.assertEqual(set(ir),{'ir_version','brain','operations','estimated_max_operations','semantic_contract','shape_contract'})
         self.assertEqual(ir['semantic_contract']['version'], 'NeuralEffects/1')
 
 if __name__=='__main__': unittest.main()

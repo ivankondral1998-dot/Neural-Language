@@ -73,6 +73,9 @@ class EffectContractTests(unittest.TestCase):
     def test_codegen_rechecks_operations_after_ir_mutation(self):
         ir = parse(B + 'observe [1]\npredict\n')
         ir['operations'].insert(0, {'op':'predict','line':6})
+        # Keep the unrelated operation-count invariant valid to isolate the
+        # state-precondition verifier rather than the new typed-IR gate.
+        ir['estimated_max_operations'] += 1
         with self.assertRaisesRegex(CompileError, 'requires observe'):
             emit(ir)
 
