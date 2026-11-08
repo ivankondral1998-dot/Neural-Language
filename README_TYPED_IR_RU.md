@@ -24,3 +24,7 @@ bash run.sh
 ## Мобильное исполнение (изолированная исследовательская ветка)
 
 В language/mobile_infer.cpp добавлено нативное inference-ядро для обученных последовательных моделей NLMODEL2, с компактным INT8-хранением и C ABI из language/mobile_infer.h. Проверка на хосте: python3 -m unittest -v language.tests.test_mobile_infer. Демонстрационная модель: language/examples/mobile_demo.nlw. Подробности: docs/MOBILE_NATIVE_INFERENCE_20261108_RU.md. Android NDK/ARM64 и реальный выигрыш ресурсов пока не проверены; main и отдельные DAG/assistant ветки не объединялись.
+
+## Компактные модели и Android Java/JNI (NLMOBIN1)
+
+Хостовый конвертер `python3 language/mobile_pack.py trained.nlw -o trained.nlmb` упаковывает FP64/INT8 и маски без изменения результатов inference. `mobile_infer.cpp` понимает оба формата; для Android предусмотрены `language/android/CMakeLists.txt`, JNI и `NeuralMobile.java`. Воспроизводимый запуск на Linux: `bash run_mobile.sh` (тесты и журналы сохраняются в новой папке `runs_mobile/`). Формат, границы и результаты: `docs/MOBILE_PACKED_MODELS_20261108_RU.md`; подключение JNI: `language/android/README_RU.md`. Android NDK, APK и испытания на устройстве пока отсутствуют.
