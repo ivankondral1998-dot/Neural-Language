@@ -205,19 +205,11 @@ def parse(text):
         return n
     steps=cost(program)
     if not program: raise CompileError("brain needs executable instructions")
-    # Flow-sensitive precondition for the new operator. A rewind may restore an
-    # input but is conservatively treated as unknown until the next observe.
-    def check_input_epoch(items,known=False):
-        for op in items:
-            if op['op']=='observe':known=True
-            elif op['op']=='rewind':known=False
-            elif op['op']=='observe_delta' and not known:
-                fail(op['line'],"observe_delta requires a preceding observe after rewind")
-            elif op['op']=='cycle':known=check_input_epoch(op['body'],known)
-        return known
-    check_input_epoch(program)
+    # Shared state/effect semantics, including restored input in snapshots.
+    # The NeuralEffects/1 metadata is additive and does not change native code.
+    effects=validate_semantics(program)
     result={'ir_version':'NeuralIR/0.2','brain':model,'operations':program,
-            'estimated_max_operations':steps}
+            'estimated_max_operations':steps,'semantic_contract':effects}
     # Additive semantic IR metadata; never silently claim general DAG support.
     def collect_deltas(items):
         found=[]
@@ -242,11 +234,123 @@ def parse(text):
     return result
 
 
+# The existing NeuralEffects/1 vocabulary from the typed-IR research branch,
+# extended only for the already-implemented observe_delta operator. Do not
+# confuse this with a full tensor/DAG effect system.
+_EFFECTS = {
+    'observe':       ((), ('current_input', 'cache'), None),
+    'observe_delta': (('current_input',), ('current_input', 'cache'), None),
+    'predict':       (('current_input', 'model_parameters'), ('cache', 'counters', 'stdout'), None),
+    'learn':         (('current_input', 'model_parameters'), ('model_parameters', 'cache', 'model_version', 'counters'), None),
+    'tune':          ((), ('runtime_mode',), None),
+    'weight':        (('model_parameters',), ('model_parameters', 'model_version', 'cache'), None),
+    'edge':          (('model_parameters',), ('model_parameters', 'model_version', 'cache'), None),
+    'remember':      (('current_input', 'model_parameters'), ('snapshots', 'stdout'), None),
+    'rewind':        (('snapshots',), ('current_input', 'model_parameters', 'model_version', 'cache', 'stdout'), None),
+    'inspect':       (('model_parameters',), ('stdout',), None),
+    'advise':        (('current_input', 'model_parameters'), ('cache', 'counters', 'event_log', 'stdout'), None),
+    'optimize':      (('current_input', 'model_parameters'), ('runtime_mode', 'cache', 'counters', 'event_log', 'stdout'), None),
+    'validate':      (('model_parameters',), ('event_log', 'stdout'), None),
+    'save_model':    (('model_parameters',), ('stdout',), 'write'),
+    'load_model':    ((), ('model_parameters', 'model_version', 'runtime_mode', 'cache', 'stdout'), 'read'),
+    'verify':        (('current_input', 'model_parameters'), ('event_log', 'stdout'), None),
+    'expect':        (('current_input', 'model_parameters'), ('cache', 'counters', 'stdout'), None),
+    'report':        (('model_parameters',), ('stdout',), 'write'),
+}
+_NEEDS_INPUT = frozenset({'observe_delta','predict','learn','expect','advise','verify','optimize'})
+
+
+def validate_semantics(program):
+    """Check input and snapshot lifetime without unrolling up to 10^6 cycles.
+
+    Exact for current branch-free language with positive, statically bounded
+    cycle counts and checkpoint values recording whether input was bound.
+    The only transitions of the boolean input-state are identity and constants.
+    """
+    snapshots={}
+    counts={}
+
+    def require_input(op, observed):
+        if op['op'] in _NEEDS_INPUT and not observed:
+            if op['op']=='observe_delta':
+                fail(op['line'],'observe_delta requires a preceding observe or restoring an observed checkpoint')
+            fail(op['line'],f"{op['op']} requires observe before use (input state absent)")
+
+    def next_epoch(ops, observed):
+        """Second iteration / fixed-point check, without duplicating counts."""
+        for op in ops:
+            kind=op['op']
+            if kind=='cycle':
+                observed=next_epoch(op['body'],observed)
+            else:
+                require_input(op,observed)
+                if kind=='observe':observed=True
+                elif kind=='rewind':observed=snapshots[op['name']]
+        return observed
+
+    def walk(ops,observed,multiplier=1):
+        if not isinstance(ops,list):raise CompileError('NeuralEffects: operations must be a list')
+        for op in ops:
+            if not isinstance(op,dict):raise CompileError('NeuralEffects: operation must be an object')
+            kind=op.get('op')
+            if kind=='cycle':
+                count=op.get('count')
+                if type(count) is not int or not 1<=count<=100000:
+                    raise CompileError('NeuralEffects: cycle count invalid')
+                observed=walk(op.get('body'),observed,multiplier*count)
+                if count>1:observed=next_epoch(op['body'],observed)
+                continue
+            if kind not in _EFFECTS:raise CompileError(f'NeuralEffects: unsupported operation {kind!r}')
+            counts[kind]=counts.get(kind,0)+multiplier
+            require_input(op,observed)
+            if kind=='observe':observed=True
+            elif kind=='remember':
+                label=op.get('name')
+                if type(label) is not str:raise CompileError('NeuralEffects: checkpoint name invalid')
+                if multiplier>1:fail(op['line'],'checkpoint in repeating cycle would be created more than once')
+                if label in snapshots:fail(op['line'],f'checkpoint already exists: {label}')
+                if len(snapshots)>=64:fail(op['line'],'checkpoint limit exceeded (64)')
+                snapshots[label]=observed
+            elif kind=='rewind':
+                label=op.get('name')
+                if label not in snapshots:fail(op['line'],f'unknown checkpoint: {label}')
+                observed=snapshots[label]
+        return observed
+
+    observed=walk(program,False)
+    return {
+        'version':'NeuralEffects/1',
+        'initial_state':{'input_bound':False},
+        'final_state':{'input_bound':observed},
+        'snapshot_count':len(snapshots),
+        'checkpoints':{name:{'input_bound':state} for name,state in snapshots.items()},
+        'operation_counts':dict(sorted(counts.items())),
+        'effects':{
+            kind:{'requires':['current_input'] if kind in _NEEDS_INPUT else [],
+                  'reads':list(_EFFECTS[kind][0]),
+                  'writes':list(_EFFECTS[kind][1]),
+                  'filesystem':_EFFECTS[kind][2]}
+            for kind in sorted(counts)
+        },
+        'scope':'static success-path model; runtime checks remain mandatory',
+    }
+
+
+def verify_semantic_contract(ir):
+    """Recheck effect metadata after any IR transform and before native emit."""
+    contract=validate_semantics(ir['operations'])
+    declared=ir.get('semantic_contract')
+    if declared is not None and declared!=contract:
+        raise CompileError('Neural IR semantic contract mismatch')
+    return contract
+
+
 def verify_neural_changes(ir):
     """Validate the additive NeuralChanges/1 contract before analysis or codegen.
 
     This is deliberately narrow; it is not a general-purpose typed DAG verifier.
     """
+    verify_semantic_contract(ir)
     brain=ir.get('brain')
     if not isinstance(brain,dict):raise CompileError('NeuralChanges: missing brain')
     senses=brain.get('senses')
@@ -255,19 +359,19 @@ def verify_neural_changes(ir):
     neurons=brain.get('neurons')
     if not isinstance(neurons,list) or not neurons:
         raise CompileError('NeuralChanges: neuron structure invalid')
+    # Lifecycle rules are checked by verify_semantic_contract above, using
+    # checkpoint-aware NeuralEffects. Only delta payload/occurrences are checked
+    # here; the old naive rewind=False walk incorrectly rejected valid restores.
     occurrences=[]
-    def visit(items,observed=False):
+    def visit(items):
         if not isinstance(items,list):raise CompileError('NeuralChanges: operations invalid')
         for op in items:
             if not isinstance(op,dict):raise CompileError('NeuralChanges: operation invalid')
             kind=op.get('op')
-            if kind=='observe':observed=True
-            elif kind=='rewind':observed=False
-            elif kind=='observe_delta':
+            if kind=='observe_delta':
                 idx=op.get('index')
                 delta=op.get('delta')
                 lineno=op.get('line')
-                if not observed:raise CompileError('NeuralChanges: observe_delta requires observe')
                 if type(idx) is not int or not 0<=idx<senses:
                     raise CompileError('NeuralChanges: observe_delta index invalid')
                 if type(delta) not in (int,float) or not math.isfinite(delta) or abs(delta)>=1e9:
@@ -275,8 +379,7 @@ def verify_neural_changes(ir):
                 if type(lineno) is not int or lineno<1:
                     raise CompileError('NeuralChanges: physical line invalid')
                 occurrences.append({'line':lineno,'index':idx})
-            elif kind=='cycle':observed=visit(op.get('body'),observed)
-        return observed
+            elif kind=='cycle':visit(op.get('body'))
     visit(ir.get('operations'))
     meta=ir.get('neural_changes')
     if not occurrences:
