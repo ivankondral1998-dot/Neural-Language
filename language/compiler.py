@@ -234,6 +234,7 @@ def parse(text):
     return result
 
 
+
 # The existing NeuralEffects/1 vocabulary from the typed-IR research branch,
 # extended only for the already-implemented observe_delta operator. Do not
 # confuse this with a full tensor/DAG effect system.
