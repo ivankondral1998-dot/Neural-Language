@@ -67,7 +67,7 @@ inline Model load_binary_checkpoint(const std::string& path,std::size_t max_byte
     check(inputs>=1 && inputs<=2048 && layers>=1 && layers<=8 && nweights>=1 && nweights<=4000000u,
           "binary checkpoint dimensions invalid");
     check(payload==file_size-40,"binary checkpoint length or trailing bytes invalid");
-    // An in-memory tensor representation is always at least as large as the serialized payload.
+    // Conservative serialized-payload cap; tensor-memory and activation caps are checked separately.
     check(payload<=static_cast<uint64_t>(max_bytes),"binary checkpoint exceeds byte budget");
     Model model;
     model.input_size=static_cast<int>(inputs);
