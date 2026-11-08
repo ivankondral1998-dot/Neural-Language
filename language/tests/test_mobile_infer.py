@@ -127,6 +127,42 @@ class MobileInferenceTests(unittest.TestCase):
                 self.assertNotEqual(self.run_model(binary,model,[1,2]).returncode,0)
         model.write_text(original)
 
+    def test_native_c_abi_with_python_ctypes(self):
+        import ctypes
+        if not shutil.which('g++'): self.skipTest('g++ required')
+        shared=self.dir/'libneural_mobile.so'
+        cmd=['g++','-std=c++17','-O2','-shared','-fPIC','-DNL_MOBILE_LIBRARY_ONLY',
+             str(SOURCE),'-o',str(shared)]
+        built=subprocess.run(cmd,capture_output=True,text=True,timeout=60)
+        self.assertEqual(built.returncode,0,built.stderr)
+        lib=ctypes.CDLL(str(shared))
+        lib.nlmobile_open.argtypes=[ctypes.c_char_p,ctypes.c_size_t]
+        lib.nlmobile_open.restype=ctypes.c_void_p
+        lib.nlmobile_close.argtypes=[ctypes.c_void_p]
+        lib.nlmobile_input_count.argtypes=[ctypes.c_void_p]
+        lib.nlmobile_input_count.restype=ctypes.c_size_t
+        lib.nlmobile_output_count.argtypes=[ctypes.c_void_p]
+        lib.nlmobile_output_count.restype=ctypes.c_size_t
+        lib.nlmobile_predict.argtypes=[ctypes.c_void_p,ctypes.POINTER(ctypes.c_double),
+                                      ctypes.c_size_t,ctypes.POINTER(ctypes.c_double),ctypes.c_size_t]
+        lib.nlmobile_predict.restype=ctypes.c_int
+        lib.nlmobile_last_error.restype=ctypes.c_char_p
+        path=self.dir/'cabi.nlw'
+        reference=write_model(path,2,[(1,2,0,[0.15],[0.4,-0.7],[1,1])])
+        handle=lib.nlmobile_open(str(path).encode(),4096)
+        self.assertTrue(handle,lib.nlmobile_last_error())
+        try:
+            self.assertEqual(lib.nlmobile_input_count(handle),2)
+            self.assertEqual(lib.nlmobile_output_count(handle),1)
+            x=(ctypes.c_double*2)(1.0,0.5)
+            result=(ctypes.c_double*1)()
+            self.assertEqual(lib.nlmobile_predict(handle,x,2,result,1),1)
+            self.assertAlmostEqual(result[0],reference([1,0.5])[0],delta=1e-13)
+            self.assertEqual(lib.nlmobile_predict(handle,x,2,result,0),-1)
+            self.assertIn(b'buffer',lib.nlmobile_last_error())
+        finally: lib.nlmobile_close(handle)
+        self.assertFalse(lib.nlmobile_open(str(path).encode(),1))
+
     def test_embedding_without_cli_main(self):
         if not shutil.which('g++'): self.skipTest('g++ required')
         src=self.dir/'embed.cpp'
