@@ -51,8 +51,8 @@ inline void finite(double v, const char* where) {
         throw std::runtime_error(std::string("invalid numeric value: ")+where);
 }
 inline std::string escape(const std::string& s) { std::string out; for (unsigned char c:s) {if(c=='"')out+="\\\"";else if(c=='\\')out+="\\\\";else if(c=='\n')out+="\\n";else if(c<32) {std::ostringstream o;o<<"\\u"<<std::hex<<std::setfill('0')<<std::setw(4)<<int(c);out+=o.str();}else out+=char(c);}return out;}
-inline double act(double z,int type) { if(type==1) return std::max(0.0,z); if(type==2) return z>=0?1.0/(1.0+std::exp(-z)):std::exp(z)/(1.0+std::exp(z)); return z; }
-inline double derivative(double z,double a,int type) {if(type==1)return z>0?1.0:0.0;if(type==2)return a*(1-a);return 1.0;}
+inline double act(double z,int type) { if(type==1) return std::max(0.0,z); if(type==2) return z>=0?1.0/(1.0+std::exp(-z)):std::exp(z)/(1.0+std::exp(z)); if(type==3) return std::tanh(z); return z; }
+inline double derivative(double z,double a,int type) {if(type==1)return z>0?1.0:0.0;if(type==2)return a*(1-a);if(type==3)return 1-a*a;return 1.0;}
 struct Layer {
   std::string name; int in=0,out=0,type=0,storage=0; std::vector<int> sources; std::vector<double> w,b;std::vector<int8_t> q; double scale=1.0/127.0;std::vector<uint8_t> enabled;size_t disabled=0;
   // Exactly one owning weight buffer: either q (one byte/weight) or w (eight bytes/weight).
@@ -91,7 +91,7 @@ public:
   explicit Model(std::string n,int ni):name(std::move(n)),ninput(ni) {require(ni>0&&ni<=2048,"input dimension out of range");}
   void layer(std::string nm,int out,int type,uint32_t seed,int storage=0) {
     require(out>0&&out<=4096,"layer dimension out of range");require(layers.size()<8,"too many layers");
-    require(storage==0||storage==1,"storage must be float or int8");
+    require(storage==0||storage==1,"storage must be float or int8");require(type>=0&&type<=3,"invalid activation");
     int in=layers.empty()?ninput:layers.back().out;
     size_t total=static_cast<size_t>(in)*out;require(total<=4000000,"weight budget exceeded");
     Layer l;l.name=std::move(nm);l.in=in;l.out=out;l.type=type;l.storage=storage;
@@ -110,7 +110,7 @@ public:
     require(!nm.empty()&&nm!="input","invalid graph layer name");
     require(out>0&&out<=4096&&layers.size()<8,"invalid graph layer size");
     require(storage==0||storage==1,"invalid graph layer storage");
-    require(type>=0&&type<=2,"invalid graph activation");
+    require(type>=0&&type<=3,"invalid graph activation");
     require(!parents.empty()&&parents.size()<=8,"graph parent count invalid");
     for(const auto& l:layers)require(l.name!=nm,"duplicate graph layer");
     std::vector<int> indices;int in=0;
