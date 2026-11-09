@@ -89,7 +89,7 @@ def parse(text):
             nm=ident(t[1],line)
             if nm=='input' or nm in seen:fail(line,"duplicate or reserved neuron layer")
             size=integer(t[2],line,1,4096)
-            if t[3] not in ('linear','relu','sigmoid'):fail(line,"activation must be linear, relu or sigmoid")
+            if t[3] not in ('linear','relu','sigmoid','tanh'):fail(line,"activation must be linear, relu, sigmoid or tanh")
             rest=t[4:]
             storage='float'
             if rest and rest[0] in ('float','int8'):storage=rest.pop(0)
@@ -454,7 +454,7 @@ def verify_typed_ir(ir):
         require(name not in shapes, f'duplicate neuron layer: {name}')
         size=uint(layer.get('size'),1,4096,f'layer {index} size')
         activation=layer.get('activation')
-        require(type(activation) is str and activation in ('linear','relu','sigmoid'),
+        require(type(activation) is str and activation in ('linear','relu','sigmoid','tanh'),
                 f'layer {index} invalid activation')
         storage=layer.get('storage','float')
         require(type(storage) is str and storage in ('float','int8'),
@@ -726,7 +726,7 @@ def emit(ir):
     verify_neural_changes(ir)
     b=ir['brain']; lines=['#include "neural_runtime.hpp"','#include <exception>', 'int main() {','try {',f'neural::Model brain({string(b["name"])},{b["senses"]});']
     for k,l in enumerate(b['neurons']):
-        typ={'linear':0,'relu':1,'sigmoid':2}[l['activation']]
+        typ={'linear':0,'relu':1,'sigmoid':2,'tanh':3}[l['activation']]
         store=1 if l.get('storage')=='int8' else 0
         if b.get('graph'):
             sources=l.get('sources',[b['neurons'][k-1]['name']] if k else ['input'])
