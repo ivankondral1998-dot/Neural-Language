@@ -15,7 +15,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-import tempfile
+import secrets
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -137,8 +137,7 @@ def main() -> int:
     runs = ROOT / "runs"
     runs.mkdir(exist_ok=True)
     if args.output is None:
-        path = Path(tempfile.mkdtemp(prefix="android_ndk_", dir=runs))
-        path.rmdir()  # only the empty, freshly-created directory is removed
+        path = runs / ("android_ndk_" + secrets.token_hex(8))
     else:
         path = args.output.resolve()
     run(args.ndk.resolve(), path)
