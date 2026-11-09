@@ -241,6 +241,18 @@ public:
         for(int r=0;r<l.out;r++) {
           z[k][r]+=l.b[r];finite(z[k][r],"forward activation");a[k][r]=act(z[k][r],l.type);
         }
+      } else if(l.storage==0 && l.disabled==0) {
+        // Guarded dense FP64 kernel: all edges active, so avoid a per-weight
+        // mask lookup and dynamic storage dispatch in the hot inner loop.
+        // Preserve the original accumulation order and per-row validation.
+        const double* const x=prev.data();
+        const double* const weights=l.w.data();
+        for(int r=0;r<l.out;r++){
+          double total=l.b[static_cast<size_t>(r)];
+          const double* const row=weights+static_cast<size_t>(r)*l.in;
+          for(int c=0;c<l.in;c++)total+=row[c]*x[c];
+          finite(total,"forward activation");z[k][r]=total;a[k][r]=act(total,l.type);
+        }
       } else {
         for(int r=0;r<l.out;r++){
           double total=l.b[r];size_t base=static_cast<size_t>(r)*l.in;
