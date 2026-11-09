@@ -1,0 +1,63 @@
+name: Neural Language Android NDK artifact (manual only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-android-arm64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out selected research branch
+        uses: actions/checkout@v4
+
+      - name: Download official NDK r30 and verify checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --connect-timeout 20 \
+            'https://dl.google.com/android/repository/android-ndk-r30-linux.zip' \
+            --output "$RUNNER_TEMP/android-ndk-r30-linux.zip"
+          echo '5107f898313790e449e87eee2183d9a20602dee9  '"$RUNNER_TEMP/android-ndk-r30-linux.zip" | sha1sum --check -
+          unzip -q "$RUNNER_TEMP/android-ndk-r30-linux.zip" -d "$RUNNER_TEMP"
+          echo "ANDROID_NDK_HOME=$RUNNER_TEMP/android-ndk-r30" >> "$GITHUB_ENV"
+
+      - name: Build real .nir programs for Android ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile research/android_ndk/build_android_api26.py
+          sh -n research/android_ndk/run_on_device.sh
+          python3 research/android_ndk/build_android_api26.py > "$RUNNER_TEMP/android-build.json"
+          python3 - "$RUNNER_TEMP/android-build.json" <<'PY'
+          import json, pathlib, sys, zipfile, hashlib
+          result = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert result["status"] == "BUILD_PASS_NOT_DEVICE_TESTED"
+          assert len(result["binaries"]) == 3
+          archive = pathlib.Path(result["zip_path"])
+          assert archive.is_file()
+          assert hashlib.sha256(archive.read_bytes()).hexdigest() == result["zip_sha256"]
+          with zipfile.ZipFile(archive) as z:
+              assert z.testzip() is None
+              required = {"pretrained_cartpole", "integrated", "inference",
+                          "cartpole_pretrained.nlw", "SHA256SUMS",
+                          "run_on_device.sh", "build_manifest.json", "README_ANDROID.md"}
+              assert required.issubset(z.namelist())
+          pathlib.Path("android-ndk-artifact-path.txt").write_text(str(archive) + "\n")
+          print("ANDROID_NDK_ARCHIVE_VERIFIED", archive, result["zip_sha256"])
+          PY
+
+      - name: Preserve ZIP and build evidence as downloadable artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: neural-language-android-api26-${{ github.sha }}
+          path: |
+            runs/android_ndk_*.zip
+            runs/android_ndk_*/build_manifest.json
+            runs/android_ndk_*/SHA256SUMS
+            runs/android_ndk_*/compile.log
+          if-no-files-found: error
+          retention-days: 30
