@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
@@ -94,6 +95,19 @@ def verify_trace(lines: Iterable[str], layers, episodes: int, *, require_solved:
             "max_abs_cpp_vs_python": worst_error, "oracle": "independent stdlib FP64"}
 
 
+def strip_model_logs(lines: Iterable[str], model_name: str) -> list[str]:
+    """Require the two exact model-load notices emitted by neural::Model.
+
+    Runtime load_model writes to stdout, not stderr. Treat unexpected output
+    as a failure rather than ignoring arbitrary non-TRACE diagnostics.
+    """
+    lines = list(lines)
+    expected = f"MODEL_LOADED {model_name} version=1"
+    if lines[:2] != [expected, expected]:
+        raise ValueError(f"unexpected model loader notices: {lines[:2]!r}")
+    return lines[2:]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--episodes", type=int, default=10)
@@ -105,10 +119,17 @@ def main() -> int:
         raise RuntimeError("missing C++ pilot source or neural_runtime.hpp; run in the complete repository")
     with tempfile.TemporaryDirectory(prefix="nl_cartpole_") as build:
         exe = Path(build) / "agent_cartpole_trace"
+        # Neural Language's safe_model_filename() deliberately rejects paths.
+        # Stage the exact bytes as a safe basename inside the temporary cwd.
+        staged_name = "cartpole_pretrained.nlw"
+        staged_model = Path(build) / staged_name
+        shutil.copyfile(args.model, staged_model)
         compile_command = [args.compiler, "-std=c++17", "-O2", "-I", str(HEADER_DIR), str(SOURCE), "-o", str(exe)]
         subprocess.run(compile_command, check=True, capture_output=True, text=True)
-        executed = subprocess.run([str(exe), str(args.model), str(args.episodes)], check=True, capture_output=True, text=True)
-        result = verify_trace(executed.stdout.splitlines(), layers, args.episodes)
+        executed = subprocess.run([str(exe), staged_name, str(args.episodes)],
+                                  cwd=build, check=True, capture_output=True, text=True)
+        trace = strip_model_logs(executed.stdout.splitlines(), staged_name)
+        result = verify_trace(trace, layers, args.episodes)
     result["baseline_python_episodes"] = evaluate(layers, args.episodes)["solved_500"]
     result["compiler"] = args.compiler
     result["status"] = "PASS"
