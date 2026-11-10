@@ -4,7 +4,7 @@ set -eu
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 root=$(CDPATH= cd -- "$here/../.." && pwd)
 run=$(mktemp -d)
-trap 'rm -rf "$run"' EXIT HUP INT TERM
+printf 'run_dir=%s\n' "$run"
 cp "$here/targets.txt" "$here/features.txt" "$run/"
 python3 "$root/language/compiler.py" "$here/regression_train.nir" -o "$run/train"
 python3 "$root/language/compiler.py" "$here/regression_infer.nir" -o "$run/infer"
