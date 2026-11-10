@@ -1,0 +1,10 @@
+# Optional bounded-memory profile for the existing HAR model.
+# Same trained weights and FP64 predictions; input is read twice.
+brain HAR {
+  senses 561
+  neurons hidden 16 tanh
+  neurons activity 6 linear
+}
+load_model "har_model.nlw"
+tune full
+predict_data "har_test.txt" samples 2947 stream
