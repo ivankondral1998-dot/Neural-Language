@@ -1,0 +1,9 @@
+{
+  "decision": "ACCEPT",
+  "steps": 2,
+  "learning_rate": 0.00001,
+  "baseline_loss": 3.4696820872698644,
+  "candidate_loss": 3.418077454086422,
+  "relative_gain": 0.014873014842707873,
+  "candidate_sha256": "ecc3d0bcd2370f733070cc1de5c1fd3728d3b1ef523640a80cb2e2c22d43d442"
+}

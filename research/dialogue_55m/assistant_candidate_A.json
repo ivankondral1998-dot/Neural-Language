@@ -1,0 +1,8 @@
+{
+  "decision": "REJECT_NO_VALIDATION_GAIN",
+  "steps": 2,
+  "learning_rate": 0.00005,
+  "baseline_loss": 3.4696820872698644,
+  "candidate_loss": 3.520651647286822,
+  "relative_gain": -0.014689979869903053
+}
