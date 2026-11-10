@@ -90,10 +90,14 @@ inline void train_data(Model& model, const std::string& path, int samples, int e
               << " steps=" << static_cast<uint64_t>(samples) * epochs << " seed=" << seed << '\n';
 }
 
-inline void predict_data(Model& model, const std::string& path, int samples) {
+inline void predict_data(Model& model, const std::string& path, int samples,
+                         bool prefer_full_reuse = false) {
     const auto rows = read_dataset(path, samples, model.ninput);
     for (size_t i = 0; i < rows.size(); ++i) {
-        model.observe(rows[i].features);
+        if (prefer_full_reuse && model.mode == Model::FULL)
+            model.observe_full_reuse(rows[i].features);
+        else
+            model.observe(rows[i].features);
         const auto& prediction = model.infer(false);
         std::cout << "DATA_PREDICT index=" << i << " values=";
         for (size_t j = 0; j < prediction.size(); ++j)
