@@ -1,0 +1,8 @@
+# Native vector-to-vector regression: data owns continuous FP64 targets.
+brain VectorRegression {
+  senses 2
+  neurons predictions 2 linear
+  init 42
+}
+train_data "targets.txt" samples 4 epochs 80 rate 0.1 seed 17 targets vector
+save_model "regression.nlw"
