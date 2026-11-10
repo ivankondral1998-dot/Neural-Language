@@ -141,6 +141,13 @@ static void check_subtle_fp64_cancellation() {
   const double wrong=unsafe.infer(false)[0];
   require_test(std::abs(wrong-correct)>1.0,
                "regression no longer distinguishes historical unsafe algorithm");
+  require_test(!unsafe.cache_canonical,"experimental cache provenance not tracked");
+  const size_t before=unsafe.counters.full;
+  unsafe.strict_numeric=true;
+  require_test(unsafe.infer(false)[0]==correct,
+               "strict policy toggle exposed prior experimental output");
+  require_test(unsafe.counters.full==before+1,
+               "strict policy toggle must rerun canonical FULL");
 }
 static void check_sgd_transaction() {
   neural::Model m("TransactionalSGD",2);

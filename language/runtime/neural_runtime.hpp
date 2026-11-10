@@ -530,6 +530,9 @@ public:
   }
   const std::vector<double>& infer(bool announce=true){
     if(!cache)forward();
+    // Opting back into the strict profile must never expose an earlier
+    // experimental algebraic result, even if no new edit was staged.
+    else if(strict_numeric && !cache_canonical)forward();
     else if(mode==FULL && (!cache_canonical || !pending.empty() || !pending_input.empty()))forward();
     else if(!pending.empty()){
       if(strict_numeric)strict_sparse_update();else flush_pending();
