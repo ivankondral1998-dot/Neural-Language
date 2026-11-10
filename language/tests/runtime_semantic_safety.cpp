@@ -169,6 +169,23 @@ static void check_simple_delta_value() {
   near(fast.infer(false)[0],0.75,"delta after input delta");
   require_test(fast.counters.input_delta>0,"simple delta must exercise incremental path");
 }
+static void check_hidden_rounding_cancellation() {
+  neural::Model fast("Roundoff",3), full("Roundoff",3);
+  for(auto* model : {&fast,&full}) {
+    model->layer("out",1,0,11);
+    model->layers[0].w={1.e16,1.,-1.e16};
+    model->layers[0].b={0.};
+    model->observe({1.,0.,1.});
+  }
+  fast.mode=neural::Model::DELTA;
+  full.mode=neural::Model::FULL;
+  near(fast.infer(false)[0],0.,"initial rounding DELTA");
+  near(full.infer(false)[0],0.,"initial rounding FULL");
+  fast.change_input(1,1.);
+  full.change_input(1,1.);
+  near(full.infer(false)[0],0.,"canonical cancellation");
+  near(fast.infer(false)[0],0.,"incremental cancellation");
+}
 int main() {
   int failures=0;
   auto run = [&](const char* name, const std::function<void()>& test) {
@@ -188,7 +205,8 @@ int main() {
   run("sgd_transaction_rollback", check_sgd_transaction);
   run("dag_sgd_transaction_rollback", check_dag_sgd_transaction);
   run("simple_input_delta_matches_full", check_simple_delta_value);
+  run("hidden_roundoff_cancellation", check_hidden_rounding_cancellation);
   std::cout << "SEMANTIC_SAFETY " << (failures?"FAIL":"PASS") <<
-               " cases=10 failed=" << failures << "\n";
+               " cases=11 failed=" << failures << "\n";
   return failures ? 1 : 0;
 }
