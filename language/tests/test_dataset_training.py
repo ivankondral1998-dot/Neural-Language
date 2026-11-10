@@ -26,12 +26,19 @@ class DatasetTrainingTests(unittest.TestCase):
         self.assertEqual(ir["semantic_contract"]["effects"]["train_data"]["filesystem"], "read")
         self.assertTrue(ir["semantic_contract"]["final_state"]["input_bound"])
         self.assertIn('neural::train_data(brain,"train.txt",2,3,', compiler.emit(ir))
+        streaming_ir = compiler.parse(BRAIN + PREDICT.rstrip() + " stream\n")
+        self.assertEqual(streaming_ir["estimated_max_operations"], 4)
+        self.assertEqual(streaming_ir["shape_contract"]["operation_signatures"]["predict_data"]["stream"],
+                         "verified_two_pass")
+        self.assertIn('neural::predict_data_streaming(brain,"test.txt",2)',
+                      compiler.emit(streaming_ir))
 
     def test_bad_source_and_mutated_ir(self):
         for bad in (TRAIN.replace("train.txt", "../train.txt"), TRAIN.replace("epochs 3", "epochs 0"),
                     TRAIN.replace("rate 0.1", "rate 1.01"), TRAIN.replace("seed 17", "seed 4294967296"),
                     TRAIN.replace("samples 2 epochs 3", "samples 10000 epochs 101"),
-                    TRAIN.replace("samples 2", "samples 100001")):
+                    TRAIN.replace("samples 2", "samples 100001"),
+                    TRAIN.rstrip() + " stream\n"):
             with self.subTest(source=bad), self.assertRaises(compiler.CompileError):
                 compiler.parse(BRAIN + bad)
         ir = compiler.parse(BRAIN + TRAIN)
@@ -40,6 +47,11 @@ class DatasetTrainingTests(unittest.TestCase):
             edited = copy.deepcopy(ir)
             edited["operations"][0][key] = value
             with self.subTest(key=key), self.assertRaises(compiler.CompileError):
+                compiler.emit(edited)
+        for value in (False, 1, "yes"):
+            edited = copy.deepcopy(compiler.parse(BRAIN + PREDICT.rstrip() + " stream\n"))
+            edited["operations"][0]["stream"] = value
+            with self.subTest(stream=value), self.assertRaises(compiler.CompileError):
                 compiler.emit(edited)
 
     def build(self, root, name, source, cxx):
@@ -63,6 +75,8 @@ class DatasetTrainingTests(unittest.TestCase):
                 root = Path(tmp)
                 trainer = self.build(root, "trainer", BRAIN + TRAIN + 'save_model "weights.nlw"\n', cxx)
                 predictor = self.build(root, "infer", BRAIN + 'load_model "weights.nlw"\n' + PREDICT, cxx)
+                streamer = self.build(root, "infer_stream", BRAIN + 'load_model "weights.nlw"\n'
+                                      + PREDICT.rstrip() + " stream\n", cxx)
                 for name in ("first", "repeat"):
                     run = root / name
                     run.mkdir()
@@ -74,6 +88,9 @@ class DatasetTrainingTests(unittest.TestCase):
                     result = self.run_native(predictor, run)
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(result.stdout.count("DATA_PREDICT index="), 2)
+                    streamed = self.run_native(streamer, run)
+                    self.assertEqual(streamed.returncode, 0, streamed.stderr)
+                    self.assertEqual(result.stdout, streamed.stdout)
                 self.assertEqual((root / "first/weights.nlw").read_bytes(),
                                  (root / "repeat/weights.nlw").read_bytes())
                 bad = root / "bad"
@@ -94,6 +111,9 @@ class DatasetTrainingTests(unittest.TestCase):
                     result = self.run_native(predictor, bad)
                     self.assertNotEqual(result.returncode, 0)
                     self.assertNotIn("DATA_PREDICT index=", result.stdout)
+                    streamed = self.run_native(streamer, bad)
+                    self.assertNotEqual(streamed.returncode, 0)
+                    self.assertNotIn("DATA_PREDICT index=", streamed.stdout)
                 (bad / "weights.nlw").write_bytes((root / "first/weights.nlw").read_bytes()[:-12])
                 (bad / "test.txt").write_text("1 0\n0 1\n")
                 result = self.run_native(predictor, bad)
