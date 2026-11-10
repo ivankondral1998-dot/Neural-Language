@@ -313,7 +313,10 @@ public:
     for(size_t k=0;k<layers.size();k++) {
       const auto& l=layers[k];std::vector<double> combined;
       const auto& prev=graph?layer_input(k,combined):(k?a[k-1]:input);
-      if((int)z[k].size()!=l.out){z[k].assign(l.out,0);a[k].assign(l.out,0);} else {std::fill(z[k].begin(),z[k].end(),0.0);std::fill(a[k].begin(),a[k].end(),0.0);}
+      // Every branch writes all z/a entries before they can be read. BLAS
+      // uses beta=0, and scalar paths initialize each row from its bias.
+      // Re-clearing warm buffers adds stores without changing the result.
+      if((int)z[k].size()!=l.out){z[k].assign(l.out,0);a[k].assign(l.out,0);}
       if(uses_blas(l)) {
         blas_gemv(l.out,l.in,l.w.data(),prev.data(),z[k].data());
         counters.blas_layers++;

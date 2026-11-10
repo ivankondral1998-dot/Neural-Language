@@ -1,0 +1,24 @@
+{
+  "base_sha": "32fc5be2a44a2b08dcf875880c7b1f7e7ce42f5a",
+  "files": {
+    "language/compiler.py": "365c88285d775043b31cbc6c11aa06b1b9acc66aff428fae19bfe2a5644b040e",
+    "language/runtime/neural_runtime.hpp": "e27f57fbea152f09bc86eb0e0bbff7df6d1341f4e3e84a5a4da0e76bf0dd0f07",
+    "language/runtime/mobile_plan.hpp": "fa8d8f420b02339e6f09461e506454e2cd96a5d26172de609e4f812eff106da5",
+    "language/examples/performance.nir": "97ab22148a9f16f05a825b1bc824195e56d9faa1de6db421c9f3f5998ad3e947",
+    "language/examples/graph_sensor.nir": "336fd846f4f5962ab95695a8d1225130b33badf91704bf46262783293f4ea995",
+    "language/examples/optimization_profile.nir": "ec11a20fbb322c5f46d0bfc26781b3a8c0bd3f347a34af339845ec8ee2b74d1a",
+    "language/examples/implicit_observe.nir": "22f29a339b5d22c1ab53462873fac87f9ff1f388dc43af8b2edbf12fffa9597e",
+    "language/examples/minimal.nir": "4328c4ff289002232c0fb792fe27729cbf3b1284367a807f4bc44ac7775692bc",
+    "language/examples/assistant_hinge_baseline.nir": "22c9d5289b5f448677c2a13b694785f629b4125a436bbdbf664fbe86043be425",
+    "language/examples/pretrained_cartpole.nir": "3cfc2095cf74f267c601e942328f7fa22203dbf99c362f4dd61fee18bd06faab",
+    "language/examples/self_check.nir": "53c6ced359e9364832a82fbf4a69ac17ffa89e0684ce66037950c9149c5a04b3",
+    "language/examples/assistant_linear_baseline.nir": "e04fcef83157537708509dc4ae5887a2d17302f869a3722473f707b989542415",
+    "language/examples/integrated.nir": "0112e2015864febe70e3420ee99a19948f1d57595081c9108d753b47bc0ad4d5",
+    "language/examples/learning.nir": "db8e9126761add10b12f28c4bd60fedbc6a26e70d8983e62c0a04b2222eb2665",
+    "language/examples/observe_delta.nir": "c82b2fe686034451adf98921e2354d12d8add6f946a146aea885c2c3da340219",
+    "language/examples/inference.nir": "dff4087d6ea7e4d67a93f9450a7d5f919c41d9b82c3d1b713393458c2079a030",
+    "research/agent_pilot/models/cartpole_pretrained.nlw": "a0738c97790d61dbd7b0fe2bde1ece59ff5041457ac4c77c8aae99c0be3cf8da",
+    "research/nl_train_001/models/har_model.nlw": "30d0fbf1c19b30d8e608f79f74a87461ba75d84221732c07b6caaad7bb93a331",
+    "research/nl_train_001/models/har_initial.nlw": "873c7b9f3ea807ba40d8db491b33d6a4b51024be8057517be901d453d363bd69"
+  }
+}

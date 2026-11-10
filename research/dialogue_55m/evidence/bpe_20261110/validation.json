@@ -1,0 +1,27 @@
+{
+  "base_sha": "32fc5be2a44a2b08dcf875880c7b1f7e7ce42f5a",
+  "branch": "research/mobile-text-kernels-20261110",
+  "tests_passed": 15,
+  "test_command": "cd research/dialogue_55m && /workspace/nl-dev-venv/bin/python -m unittest -v test_tokenizer test_training_tokenizer test_assistant_dialogue",
+  "probe_command": "cd research/dialogue_55m && /workspace/nl-dev-venv/bin/python tokenizer_probe.py --output-dir /tmp/nl-dialogue-bpe-probe-20261110",
+  "scope": "Synthetic strings and fresh tiny model weights only. No original checkpoints or persona dialogue opened. No corpus language-model training.",
+  "source_sha256": {
+    "train.py": "4e3f7b467562e7bdc0d802b2944face3d998d18f13513683fbaf280ff771e1ba",
+    "chat.py": "16b62287bfb6293acbbe33422d4a535d85b3a1a3dd0b70bc3c87c4ae4e6e7c67",
+    "assistant_dialogue.py": "07271a301093e8abf3deca32990b1d19574e3feac8c07ad125ad35226915167d",
+    "dialogue_tokenizer.py": "b2b9a072d4c5e355e2585aeda2b4ae4261f0994cfeee04bb32c36aad2a49e589",
+    "experiment.nir": "cc2b6eb050674e0a7d0d55168a61d5dd0008bff4eb2a5998379b487b7e17ecd2",
+    "experiment_bpe.nir": "059a62f96a0ba827f3d3b112c643272548cf5451c5f219565a84ba7725e7e4f0",
+    "test_tokenizer.py": "353bd95130827c57f1d4a77978f5c8a1f7f466eea761d074a2f252cee6dff002",
+    "test_training_tokenizer.py": "ba3b06518081421096f120151cc5a372148948bd4cb69055a37e0acc4511a3fc",
+    "test_assistant_dialogue.py": "698717874989d93ba7be3cc76521af0c106333ecf4d6027c2392941302119881",
+    "tokenizer_probe.py": "f8415c223b116894e42830dd33df45955e77005ea217110a214d2884034d517d",
+    "requirements-tokenizer.txt": "c5080dcd99b788fe6642a72760b16c4b541f8d47b2edcfdad26da827a8beaec7",
+    "TOKENIZER_PROFILE.md": "30c0948f3840fe3d4c1fab204621ce453e0202b759143d7bf61b15a1ef55551b"
+  },
+  "evidence_sha256": {
+    "tests.log": "8df8c861179411be08d172598110600ab9f7dc1915a060c4b56fd1c9d50ba5fe",
+    "compression.json": "b6f51147fb794e0e7cd244fd2df5d6f34708b0b0e86d6494fc445bd7730b20f4",
+    "synthetic_tokenizer.json": "611f3c9f059f13366a2e1e939874d3203a6cebdc60fc411321be3321f6c9f6d9"
+  }
+}

@@ -1,0 +1,65 @@
+EQUIVALENCE_PASS shape=32x64x16 vectors=2048 exact_za=true disabled_fallback=true
+BENCH_META shape=32x64x16 samples=2048 trials=9 numeric=fp64_strict_row_order input_validation=true input_copy=true native_integer_dot_product=false device=execution_host
+TRIAL shape=32x64x16 trial=1 position=1 engine=generic_full_reuse ns_per_infer=2793.9658203125 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=1 position=2 engine=mobile_int8_full_reuse ns_per_infer=2087.48583984375 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=1 position=3 engine=independent_cpp_fp64_dequant ns_per_infer=1642.91845703125 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=2 position=1 engine=independent_cpp_fp64_dequant ns_per_infer=1622.4599609375 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=2 position=2 engine=mobile_int8_full_reuse ns_per_infer=2200.25830078125 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=2 position=3 engine=generic_full_reuse ns_per_infer=2717.53125 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=3 position=1 engine=mobile_int8_full_reuse ns_per_infer=2805.40283203125 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=3 position=2 engine=independent_cpp_fp64_dequant ns_per_infer=1842.1923828125 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=3 position=3 engine=generic_full_reuse ns_per_infer=2897.18798828125 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=4 position=1 engine=generic_full_reuse ns_per_infer=3040.3935546875 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=4 position=2 engine=independent_cpp_fp64_dequant ns_per_infer=1750.84130859375 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=4 position=3 engine=mobile_int8_full_reuse ns_per_infer=2161.94140625 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=5 position=1 engine=independent_cpp_fp64_dequant ns_per_infer=1625.48583984375 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=5 position=2 engine=generic_full_reuse ns_per_infer=2605.8916015625 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=5 position=3 engine=mobile_int8_full_reuse ns_per_infer=2077.49951171875 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=6 position=1 engine=mobile_int8_full_reuse ns_per_infer=2043.322265625 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=6 position=2 engine=generic_full_reuse ns_per_infer=2832.56689453125 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=6 position=3 engine=independent_cpp_fp64_dequant ns_per_infer=1663.1318359375 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=7 position=1 engine=generic_full_reuse ns_per_infer=2816.427734375 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=7 position=2 engine=mobile_int8_full_reuse ns_per_infer=2222.13818359375 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=7 position=3 engine=independent_cpp_fp64_dequant ns_per_infer=1840.03564453125 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=8 position=1 engine=independent_cpp_fp64_dequant ns_per_infer=1830.4384765625 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=8 position=2 engine=mobile_int8_full_reuse ns_per_infer=2247.93798828125 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=8 position=3 engine=generic_full_reuse ns_per_infer=2658.54541015625 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=9 position=1 engine=mobile_int8_full_reuse ns_per_infer=2057.958984375 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=9 position=2 engine=independent_cpp_fp64_dequant ns_per_infer=1629.61328125 checksum=-1866.5278511017402
+TRIAL shape=32x64x16 trial=9 position=3 engine=generic_full_reuse ns_per_infer=2811.333984375 checksum=-1866.5278511017402
+SUMMARY shape=32x64x16 engine=generic_full_reuse min_ns=2605.8916015625 p50_ns=2811.333984375 p95_ns=3040.3935546875 max_ns=3040.3935546875 distribution=per_trial_mean_ns_per_inference
+SUMMARY shape=32x64x16 engine=mobile_int8_full_reuse min_ns=2043.322265625 p50_ns=2161.94140625 p95_ns=2805.40283203125 max_ns=2805.40283203125 distribution=per_trial_mean_ns_per_inference
+SUMMARY shape=32x64x16 engine=independent_cpp_fp64_dequant min_ns=1622.4599609375 p50_ns=1663.1318359375 p95_ns=1842.1923828125 max_ns=1842.1923828125 distribution=per_trial_mean_ns_per_inference
+EQUIVALENCE_PASS shape=128x128x32 vectors=2048 exact_za=true disabled_fallback=true
+BENCH_META shape=128x128x32 samples=2048 trials=9 numeric=fp64_strict_row_order input_validation=true input_copy=true native_integer_dot_product=false device=execution_host
+TRIAL shape=128x128x32 trial=1 position=1 engine=generic_full_reuse ns_per_infer=18429.7099609375 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=1 position=2 engine=mobile_int8_full_reuse ns_per_infer=14743.8173828125 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=1 position=3 engine=independent_cpp_fp64_dequant ns_per_infer=13182.22705078125 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=2 position=1 engine=independent_cpp_fp64_dequant ns_per_infer=11157.5107421875 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=2 position=2 engine=mobile_int8_full_reuse ns_per_infer=16674.7900390625 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=2 position=3 engine=generic_full_reuse ns_per_infer=17152.79931640625 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=3 position=1 engine=mobile_int8_full_reuse ns_per_infer=13611.30078125 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=3 position=2 engine=independent_cpp_fp64_dequant ns_per_infer=11177.35498046875 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=3 position=3 engine=generic_full_reuse ns_per_infer=19828.17236328125 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=4 position=1 engine=generic_full_reuse ns_per_infer=17472.99853515625 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=4 position=2 engine=independent_cpp_fp64_dequant ns_per_infer=11018.9287109375 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=4 position=3 engine=mobile_int8_full_reuse ns_per_infer=20747.33642578125 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=5 position=1 engine=independent_cpp_fp64_dequant ns_per_infer=11746.21240234375 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=5 position=2 engine=generic_full_reuse ns_per_infer=16313.11083984375 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=5 position=3 engine=mobile_int8_full_reuse ns_per_infer=15625.69287109375 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=6 position=1 engine=mobile_int8_full_reuse ns_per_infer=15698.7490234375 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=6 position=2 engine=generic_full_reuse ns_per_infer=17263.74072265625 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=6 position=3 engine=independent_cpp_fp64_dequant ns_per_infer=11972.40576171875 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=7 position=1 engine=generic_full_reuse ns_per_infer=18101.86962890625 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=7 position=2 engine=mobile_int8_full_reuse ns_per_infer=14115.896484375 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=7 position=3 engine=independent_cpp_fp64_dequant ns_per_infer=11381.4990234375 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=8 position=1 engine=independent_cpp_fp64_dequant ns_per_infer=13289.81494140625 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=8 position=2 engine=mobile_int8_full_reuse ns_per_infer=14526.603515625 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=8 position=3 engine=generic_full_reuse ns_per_infer=16330.048828125 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=9 position=1 engine=mobile_int8_full_reuse ns_per_infer=14812.490234375 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=9 position=2 engine=independent_cpp_fp64_dequant ns_per_infer=11635.60009765625 checksum=-2375.7559166056194
+TRIAL shape=128x128x32 trial=9 position=3 engine=generic_full_reuse ns_per_infer=16290.193359375 checksum=-2375.7559166056194
+SUMMARY shape=128x128x32 engine=generic_full_reuse min_ns=16290.193359375 p50_ns=17263.74072265625 p95_ns=19828.17236328125 max_ns=19828.17236328125 distribution=per_trial_mean_ns_per_inference
+SUMMARY shape=128x128x32 engine=mobile_int8_full_reuse min_ns=13611.30078125 p50_ns=14812.490234375 p95_ns=20747.33642578125 max_ns=20747.33642578125 distribution=per_trial_mean_ns_per_inference
+SUMMARY shape=128x128x32 engine=independent_cpp_fp64_dequant min_ns=11018.9287109375 p50_ns=11635.60009765625 p95_ns=13289.81494140625 max_ns=13289.81494140625 distribution=per_trial_mean_ns_per_inference
+INT8_BENCH_PASS performance_gate=not_defined android_claim=false

@@ -1,0 +1,20 @@
+test_bpe_roundtrip_digest_and_special_literals (test_tokenizer.TokenizerTests.test_bpe_roundtrip_digest_and_special_literals) ... ok
+test_legacy_ids (test_tokenizer.TokenizerTests.test_legacy_ids) ... ok
+test_lossy_pipeline_rejected (test_tokenizer.TokenizerTests.test_lossy_pipeline_rejected) ... ok
+test_unknown_metadata_rejected (test_tokenizer.TokenizerTests.test_unknown_metadata_rejected) ... ok
+test_bpe_training_chat_and_continuation_preserve_metadata (test_training_tokenizer.TrainingTokenizerTests.test_bpe_training_chat_and_continuation_preserve_metadata) ... ok
+test_exact_resume_and_no_overwrite (test_training_tokenizer.TrainingTokenizerTests.test_exact_resume_and_no_overwrite) ... ok
+test_legacy_checkpoint_and_mismatched_tokenizer (test_training_tokenizer.TrainingTokenizerTests.test_legacy_checkpoint_and_mismatched_tokenizer) ... ok
+test_locked_profiles_and_parameter_counts (test_training_tokenizer.TrainingTokenizerTests.test_locked_profiles_and_parameter_counts) ... ok
+test_resume_rejects_changed_tokenizer_identity (test_training_tokenizer.TrainingTokenizerTests.test_resume_rejects_changed_tokenizer_identity) ... ok
+test_streaming_and_materialization_have_separate_bounds (test_training_tokenizer.TrainingTokenizerTests.test_streaming_and_materialization_have_separate_bounds) ... ok
+test_streaming_mask_and_overlong_rejection (test_training_tokenizer.TrainingTokenizerTests.test_streaming_mask_and_overlong_rejection) ... ok
+test_bad_rows (test_assistant_dialogue.PolicyTests.test_bad_rows) ... ok
+test_duplicate_prompt (test_assistant_dialogue.PolicyTests.test_duplicate_prompt) ... ok
+test_masked_answer_metric (test_assistant_dialogue.PolicyTests.test_masked_answer_metric) ... ok
+test_validation_leakage (test_assistant_dialogue.PolicyTests.test_validation_leakage) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.991s
+
+OK

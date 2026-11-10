@@ -749,7 +749,10 @@ def analyze_ir(ir):
     if counts['advise']:
         messages.append('Advise compares runtime full and delta paths on synthetic edits; full may use BLAS with --blas.')
     if ir.get('compute_plan'):
-        messages.append('mobile-cpu plan specializes sequential dense FP64 inference: four independent rows, same left-to-right reduction as FULL. Not an INT8 kernel and not a phone measurement.')
+        if any(l.get('storage') == 'int8' for l in b['neurons']):
+            messages.append('mobile-cpu plan specializes sequential dense FP64 arithmetic with packed INT8 storage dequantized per term: four independent rows, same left-to-right reduction as FULL. Not native INT8 dot products and not a phone measurement.')
+        else:
+            messages.append('mobile-cpu plan specializes sequential dense FP64 inference: four independent rows, same left-to-right reduction as FULL. Not an INT8 kernel and not a phone measurement.')
     return {'operations':counts,'weights':weights,
             'minimum_weight_storage_bytes_fp64':weights*8,
             'actual_weight_bytes':b['weight_bytes'],
@@ -770,37 +773,41 @@ def string(s):
 _ACT_CODE = {'linear': 0, 'relu': 1, 'sigmoid': 2, 'tanh': 3}
 
 def make_mobile_plan(ir):
-    """Compiler-side sequential dense FP64 plan. Rejects shapes it cannot specialize."""
+    """Sequential dense FP64 arithmetic, with FP64 or packed INT8 weights."""
     brain = ir.get('brain')
     if not isinstance(brain, dict):
         raise CompileError('mobile-cpu profile requires a brain')
     if brain.get('graph'):
-        raise CompileError('mobile-cpu profile supports sequential dense FP64 only, not a DAG')
+        raise CompileError('mobile-cpu profile supports sequential dense layers only, not a DAG')
     layers_in = brain.get('neurons')
     if not isinstance(layers_in, list) or not layers_in:
         raise CompileError('mobile-cpu profile requires at least one layer')
     width = brain.get('senses')
     layers = []
     for layer in layers_in:
-        if layer.get('storage', 'float') != 'float':
-            raise CompileError('mobile-cpu FP64 profile does not apply to int8 storage; use the generic profile')
+        storage = layer.get('storage', 'float')
+        if storage not in ('float', 'int8'):
+            raise CompileError('mobile-cpu profile requires float or int8 storage')
         if 'sources' in layer:
             raise CompileError('mobile-cpu profile supports sequential layers only')
         activation = layer.get('activation')
         if activation not in _ACT_CODE:
             raise CompileError('mobile-cpu profile has an unsupported activation')
         out = layer.get('size')
-        layers.append({
+        planned_layer = {
             'name': layer['name'],
             'in': width,
             'out': out,
             'activation': activation,
             'fusion': 'gemv_bias_activation',
-            'weight_order': 'row-major-fp64',
+            'weight_order': 'row-major-int8-dequant-fp64' if storage == 'int8' else 'row-major-fp64',
             'reduction': 'left-to-right per row; up to 4 independent rows',
-        })
+        }
+        if storage == 'int8':
+            planned_layer['dequantization'] = 'double(q) * scale per term, then multiply by FP64 input'
+        layers.append(planned_layer)
         width = out
-    return {
+    plan = {
         'contract': 'NeuralPlan/1',
         'profile': 'mobile-cpu',
         'numeric': 'fp64-strict-row-order',
@@ -820,6 +827,10 @@ def make_mobile_plan(ir):
         ],
         'layers': layers,
     }
+    if any(l.get('storage') == 'int8' for l in layers_in):
+        plan['fallback'] = 'generic Model::forward when any edge is disabled or shape/storage differs from the compiled plan'
+        plan['not_claimed'][0] = 'not native INT8 dot products'
+    return plan
 
 def verify_mobile_plan(ir):
     plan = ir.get('compute_plan')
@@ -843,17 +854,22 @@ def mobile_function_source(ir):
     for index, layer in enumerate(layers):
         out = layer['size']
         act = _ACT_CODE[layer['activation']]
+        quantized = layer.get('storage') == 'int8'
+        storage = 1 if quantized else 0
         lines.append(
             f'if(m.layers[{index}].in!={width}||m.layers[{index}].out!={out}||'
-            f'm.layers[{index}].type!={act}||m.layers[{index}].storage!=0||'
+            f'm.layers[{index}].type!={act}||m.layers[{index}].storage!={storage}||'
             f'm.layers[{index}].disabled!=0)return false;'
         )
         source = 'm.input.data()' if index == 0 else f'm.a[{index - 1}].data()'
         calls.append(f'if((int)m.z[{index}].size()!={out}){{m.z[{index}].assign({out},0);m.a[{index}].assign({out},0);}}')
+        kernel = 'mobile_dense_int8_ilp4' if quantized else 'mobile_dense_ilp4'
+        weights = 'q' if quantized else 'w'
+        scale = f',m.layers[{index}].scale' if quantized else ''
         calls.append(
-            f'neural::mobile_dense_ilp4<{width},{out},{act}>('
-            f'm.layers[{index}].w.data(),m.layers[{index}].b.data(),{source},'
-            f'm.z[{index}].data(),m.a[{index}].data());'
+            f'neural::{kernel}<{width},{out},{act}>('
+            f'm.layers[{index}].{weights}.data(),m.layers[{index}].b.data(),{source},'
+            f'm.z[{index}].data(),m.a[{index}].data(){scale});'
         )
         width = out
     lines.extend(calls)

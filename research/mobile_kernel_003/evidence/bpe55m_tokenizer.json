@@ -1,0 +1,1 @@
+{"kind": "bpe4096", "vocab_size": 4096, "sha256": "a498086df0bb327dd2ec04340455145e6e3cc4a548d78c60122ba1925d067bb5", "path": "runs/bpe55m-validation/tokenizer.json"}

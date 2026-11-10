@@ -1,0 +1,16 @@
+# Native language example: packed weights, FP64 computation, runtime fallback.
+brain PackedSensor {
+  senses 5
+  neurons hidden 7 relu int8
+  neurons middle 3 sigmoid
+  neurons out 2 linear int8
+  init 11
+}
+tune full
+observe [0.25, -0.5, 0.1, 0.3, -0.2]
+predict
+edge hidden 1 0 off
+predict
+edge hidden 1 0 on
+predict
+report "packed_sensor.json"

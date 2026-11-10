@@ -1,0 +1,30 @@
+{
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "machine": "x86_64",
+  "cpu_affinity": [
+    0
+  ],
+  "compiler": "Debian clang version 19.1.7 (3+b1)",
+  "flags": [
+    "-std=c++17",
+    "-O3",
+    "-ffp-contract=off",
+    "-Wall",
+    "-Wextra",
+    "-Werror"
+  ],
+  "pairs": 5,
+  "sources": {
+    "bench_int8.cpp": "6476d3e878748ef125fdf1e48f6f1c9ecd55040ab17d019ee413f0de4653258d",
+    "cartpole_pretrained.nlw": "a0738c97790d61dbd7b0fe2bde1ece59ff5041457ac4c77c8aae99c0be3cf8da",
+    "bench_cartpole_compare.cpp": "b88e24a9986f0085708d7fec7d35562f132aca08c25e0accab2f138e4ad02cb3",
+    "before/mobile_plan.hpp": "fa8d8f420b02339e6f09461e506454e2cd96a5d26172de609e4f812eff106da5",
+    "before/neural_runtime.hpp": "e27f57fbea152f09bc86eb0e0bbff7df6d1341f4e3e84a5a4da0e76bf0dd0f07",
+    "after/mobile_plan.hpp": "0d23b22cdc7a06b383b7eb9c23d261188248a282f2fd722d6ed07ffda33f57fb",
+    "after/neural_runtime.hpp": "f7d5b109e32854aab86c6fbcf005a49e7e496118334379d27335722f8e4facb4"
+  },
+  "executables_sha256": {
+    "before": "7b25429880c4dae1341cd2d71804067e725f66bdd35f24e721706f8147a2a239",
+    "after": "324ae76cd56e43b53626ef0544d5ef04f903c4c59968528185b408d2e323140f"
+  }
+}

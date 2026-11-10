@@ -1,0 +1,79 @@
+{
+  "samples": [
+    {
+      "pair": 0,
+      "variant": "before",
+      "neural_us": 3.79477929687,
+      "cpp_us": 3.27073266602,
+      "max_abs_error": 0.0
+    },
+    {
+      "pair": 0,
+      "variant": "after",
+      "neural_us": 3.73851635742,
+      "cpp_us": 3.35306005859,
+      "max_abs_error": 0.0
+    },
+    {
+      "pair": 1,
+      "variant": "after",
+      "neural_us": 3.87713696289,
+      "cpp_us": 3.25514575195,
+      "max_abs_error": 0.0
+    },
+    {
+      "pair": 1,
+      "variant": "before",
+      "neural_us": 3.80716186523,
+      "cpp_us": 3.32541308594,
+      "max_abs_error": 0.0
+    },
+    {
+      "pair": 2,
+      "variant": "before",
+      "neural_us": 3.80126245117,
+      "cpp_us": 3.26904296875,
+      "max_abs_error": 0.0
+    },
+    {
+      "pair": 2,
+      "variant": "after",
+      "neural_us": 3.55960693359,
+      "cpp_us": 3.59408666992,
+      "max_abs_error": 0.0
+    },
+    {
+      "pair": 3,
+      "variant": "after",
+      "neural_us": 3.60806445312,
+      "cpp_us": 3.55068920898,
+      "max_abs_error": 0.0
+    },
+    {
+      "pair": 3,
+      "variant": "before",
+      "neural_us": 3.72180932617,
+      "cpp_us": 3.40777954102,
+      "max_abs_error": 0.0
+    },
+    {
+      "pair": 4,
+      "variant": "before",
+      "neural_us": 3.80290820312,
+      "cpp_us": 3.41003710938,
+      "max_abs_error": 0.0
+    },
+    {
+      "pair": 4,
+      "variant": "after",
+      "neural_us": 3.66218603516,
+      "cpp_us": 3.23320751953,
+      "max_abs_error": 0.0
+    }
+  ],
+  "before_us": 3.80126245117,
+  "after_us": 3.66218603516,
+  "cpp_us": 3.3392365722650004,
+  "interpretation": "Measured on this host only; no universal C++ or Android advantage.",
+  "before_over_after": 1.0379763383604088
+}

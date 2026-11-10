@@ -10,7 +10,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from assistant import ExperimentError, collect_training, load_evaluation, propose_branch, run_experiment
-from compiler import parse
+from compiler import CompileError, parse
 from reference_eval import ReferenceError, read_model, predict
 
 SOURCE = (ROOT/'examples/assistant_hinge_baseline.nir')
@@ -25,10 +25,10 @@ class AssistantContractTests(unittest.TestCase):
         ir=parse(text)
         candidate=propose_branch(ir, 8)
         cir=parse(candidate)
-        self.assertFalse(ir['brain']['graph'])
+        self.assertFalse(ir['brain'].get('graph', False))
         self.assertTrue(cir['brain']['graph'])
         self.assertEqual(cir['brain']['weights'],30)
-        self.assertEqual([x['sources'] for x in cir['brain']['neurons']],
+        self.assertEqual([x['sources'] for x in cir['shape_contract']['layers']],
                          [['input'],['input'],['assist_direct','assist_relu']])
         self.assertEqual(SOURCE.read_text(encoding='utf-8'),text)
         def strip_locations(ops):
@@ -37,9 +37,15 @@ class AssistantContractTests(unittest.TestCase):
         self.assertEqual(strip_locations(ir['operations']), strip_locations(cir['operations']))
 
     def test_learning_requires_observe_and_is_finite(self):
+        header = 'brain Test {\n senses 2\n neurons out 1 linear\n}\n'
+        # The compiler now rejects missing input before assistant validation.
+        with self.assertRaisesRegex(CompileError, 'learn requires observe'):
+            parse(header + 'learn [1] rate 0.1')
+        # A second learn is legal in the language, but this bounded experiment
+        # requires every target to have its own immediately preceding observe.
+        ir = parse(header + 'observe [0, 0]\nlearn [1] rate 0.1\nlearn [1] rate 0.1')
         with self.assertRaisesRegex(ExperimentError, 'immediately follow'):
-            collect_training(parse('brain Test {\n senses 2\n neurons out 1 linear\n}\n'
-                                   'learn [1] rate 0.1')['operations'])
+            collect_training(ir['operations'])
 
     def test_leakage_does_not_pass(self):
         train, _=collect_training(parse(SOURCE.read_text())['operations'])

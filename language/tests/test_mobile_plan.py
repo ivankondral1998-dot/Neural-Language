@@ -1,4 +1,9 @@
-"""mobile-cpu profile: IR plan, fallback, and FP64 agreement with generic FULL."""
+"""mobile-cpu plans: FP64 arithmetic, packed INT8 storage and generic fallback.
+
+Run from language/: python3 -m unittest -v tests.test_mobile_plan
+INT8 tests compile actual .nir and generated plans with strict FP64 arithmetic;
+they do not establish native integer dot products or Android performance.
+"""
 import json
 import shutil
 from pathlib import Path
@@ -9,7 +14,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from compiler import CompileError, emit, make_mobile_plan, parse
+from compiler import CompileError, emit, make_mobile_plan, mobile_function_source, parse
 
 TINY = """brain Tiny {
   senses 2
@@ -35,6 +40,27 @@ observe [0.1, -0.2]
 predict
 save_model "trained_mobile.nlw"
 report "train.json"
+"""
+
+MIXED = """brain Mixed {
+  senses 5
+  neurons hidden 7 relu int8
+  neurons middle 3 sigmoid
+  neurons out 5 tanh int8
+  init 11
+}
+tune full
+observe [0.25, -0.5, 0.1, 0.3, -0.2]
+predict
+edge hidden 1 0 off
+predict
+edge hidden 1 0 on
+weight out 0 1 add 0.02
+predict
+learn [0.1, -0.2, 0.3, -0.1, 0.2] rate 0.05
+predict
+save_model "mixed.nlw"
+report "mixed.json"
 """
 
 
@@ -84,16 +110,72 @@ predict_data "rows.txt" samples 2
         mobile = emit(ir)
         self.assertIn('neural::predict_data(brain,"rows.txt",2,true);', mobile)
 
-    def test_int8_and_graph_rejected(self):
-        int8 = 'brain Q {\n senses 2\n neurons h 3 relu int8\n neurons o 1 linear\n}\nobserve [0, 0]\npredict\n'
+    def test_mixed_storage_plan_describes_fp64_dequantization(self):
+        ir = parse(MIXED)
+        try:
+            plan = make_mobile_plan(ir)
+        except CompileError as error:
+            self.fail(f'mobile-cpu must support packed INT8 storage: {error}')
+        self.assertEqual(plan['numeric'], 'fp64-strict-row-order')
+        self.assertEqual(plan['layers'][0]['weight_order'], 'row-major-int8-dequant-fp64')
+        self.assertEqual(plan['layers'][1]['weight_order'], 'row-major-fp64')
+        self.assertIn('double(q) * scale', plan['layers'][0]['dequantization'])
+        ir['compute_plan'] = plan
+        cpp = emit(ir)
+        self.assertIn('neural::mobile_dense_int8_ilp4<5,7,1>', cpp)
+        self.assertIn('m.layers[0].q.data()', cpp)
+        self.assertIn('m.layers[0].scale', cpp)
+        self.assertIn('neural::mobile_dense_ilp4<7,3,2>', cpp)
+
+    def test_graph_rejected(self):
         graph = 'brain G {\n senses 2\n neurons a 2 relu from input\n neurons b 1 linear from input a\n}\nobserve [0, 1]\npredict\n'
-        with self.assertRaises(CompileError):
-            make_mobile_plan(parse(int8))
         with self.assertRaises(CompileError):
             make_mobile_plan(parse(graph))
 
 
 class PlanNative(unittest.TestCase):
+    def test_mixed_plan_native_numerics_and_fallback(self):
+        ir = parse(MIXED)
+        try:
+            ir['compute_plan'] = make_mobile_plan(ir)
+        except CompileError as error:
+            self.fail(f'mobile-cpu must support packed INT8 storage: {error}')
+        for cxx in ('g++', 'clang++'):
+            if not shutil.which(cxx):
+                continue
+            with self.subTest(cxx=cxx), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                (root / 'generated_mobile_plan.hpp').write_text(mobile_function_source(ir))
+                exe = root / 'int8_plan'
+                built = subprocess.run(
+                    [cxx, '-std=c++17', '-O2', '-ffp-contract=off', '-Wall',
+                     '-Wextra', '-Werror', '-DNEURAL_MOBILE_PLAN', '-I', str(root),
+                     '-I', str(ROOT / 'runtime'),
+                     str(ROOT / 'tests/runtime_mobile_int8_plan.cpp'), '-o', str(exe)],
+                    capture_output=True, text=True, timeout=60)
+                self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+                run = subprocess.run([str(exe)], capture_output=True, text=True, timeout=20)
+                self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+                self.assertIn('MOBILE_INT8_PLAN_PASS', run.stdout)
+
+    def test_mixed_compiled_nir_matches_generic_weights_and_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            outputs = {}
+            for name, profile in (('generic', 'generic'), ('mobile', 'mobile-cpu')):
+                directory = Path(tmp) / name
+                directory.mkdir()
+                built = compile_nir(MIXED, directory, name, profile)
+                self.assertEqual(built.returncode, 0, built.stderr)
+                run = subprocess.run([str(directory / name)], cwd=directory,
+                                     capture_output=True, text=True, timeout=20)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                outputs[name] = (run.stdout, (directory / 'mixed.nlw').read_bytes())
+                if name == 'mobile':
+                    counts = json.loads((directory / 'mixed.json').read_text())['counts']
+                    self.assertGreater(counts['mobile_plan'], 0)
+                    self.assertGreater(counts['full'], counts['mobile_plan'])
+            self.assertEqual(outputs['generic'], outputs['mobile'])
+
     def test_input_reuse_matches_full_without_reallocation(self):
         # This program tests the actual native runtime, independently of .nir
         # codegen, including bad-data rollback and stable input allocation.

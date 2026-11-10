@@ -1,0 +1,10 @@
+MODEL_LOADED cartpole_pretrained.nlw version=1
+REFERENCE_EQUIVALENCE_PASS vectors=517 max_abs_error=0
+TRIAL index=1 first=neural neural_us_per_infer=4.02369921875 plain_cpp_us_per_infer=3.25514575195
+TRIAL index=2 first=plain_cpp neural_us_per_infer=3.54537768555 plain_cpp_us_per_infer=3.19502514648
+TRIAL index=3 first=neural neural_us_per_infer=3.30673193359 plain_cpp_us_per_infer=3.04598144531
+TRIAL index=4 first=plain_cpp neural_us_per_infer=3.90148144531 plain_cpp_us_per_infer=3.15233618164
+TRIAL index=5 first=neural neural_us_per_infer=3.87713696289 plain_cpp_us_per_infer=3.26447900391
+TRIAL index=6 first=plain_cpp neural_us_per_infer=3.61371264648 plain_cpp_us_per_infer=3.42777929687
+TRIAL index=7 first=neural neural_us_per_infer=3.92477783203 plain_cpp_us_per_infer=3.46528881836
+BENCH_PASS samples=4096 trials=7 neural_median_us_per_infer=3.87713696289 plain_cpp_median_us_per_infer=3.25514575195 neural_speedup_vs_plain_cpp=0.839574609592 max_abs_error=0 checksum_abs_error=0 engine_neural=FULL engine_baseline=independent_cpp_fp64 note=mobile_on_device_needed_no_tflite_comparison

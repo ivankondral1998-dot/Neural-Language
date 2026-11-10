@@ -1,0 +1,21 @@
+test_bad_json_and_nonfinite_rejected (tests.test_assistant.AssistantContractTests.test_bad_json_and_nonfinite_rejected) ... ok
+test_existing_output_not_overwritten (tests.test_assistant.AssistantContractTests.test_existing_output_not_overwritten) ... ok
+test_leakage_does_not_pass (tests.test_assistant.AssistantContractTests.test_leakage_does_not_pass) ... ok
+test_learning_requires_observe_and_is_finite (tests.test_assistant.AssistantContractTests.test_learning_requires_observe_and_is_finite) ... ok
+test_model_proposal_is_real_graph_and_original_stays_unchanged (tests.test_assistant.AssistantContractTests.test_model_proposal_is_real_graph_and_original_stays_unchanged) ... ok
+test_reference_linear_formula (tests.test_assistant.AssistantContractTests.test_reference_linear_formula) ... ok
+test_restricted_source_rejects_hidden_side_effects (tests.test_assistant.AssistantContractTests.test_restricted_source_rejects_hidden_side_effects) ... ok
+test_unexpected_model_format_rejected (tests.test_assistant.AssistantContractTests.test_unexpected_model_format_rejected) ... ok
+test_validation_test_overlap_does_not_pass (tests.test_assistant.AssistantContractTests.test_validation_test_overlap_does_not_pass) ... ok
+test_accept_nonlinear_candidate_and_reference (tests.test_assistant.AssistantNativeTests.test_accept_nonlinear_candidate_and_reference) ... ok
+test_clang_compilation_on_both_variants (tests.test_assistant.AssistantNativeTests.test_clang_compilation_on_both_variants) ... ok
+test_no_gain_rejects_and_keeps_original (tests.test_assistant.AssistantNativeTests.test_no_gain_rejects_and_keeps_original) ... ok
+test_reference_disagreement_blocks_acceptance (tests.test_assistant.AssistantNativeTests.test_reference_disagreement_blocks_acceptance) ... ok
+test_resource_gate_rejects_and_does_not_publish (tests.test_assistant.AssistantNativeTests.test_resource_gate_rejects_and_does_not_publish) ... ok
+test_test_targets_are_not_used_for_decision (tests.test_assistant.AssistantNativeTests.test_test_targets_are_not_used_for_decision) ... ok
+test_unnecessary_graph_is_rejected_on_genuinely_linear_task (tests.test_assistant.AssistantNativeTests.test_unnecessary_graph_is_rejected_on_genuinely_linear_task) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 34.458s
+
+OK

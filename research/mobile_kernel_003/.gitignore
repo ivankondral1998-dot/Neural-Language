@@ -1,0 +1,3 @@
+# Locally compiled benchmark executables; evidence logs/JSON stay tracked.
+evidence/cartpole_*/before
+evidence/cartpole_*/after

@@ -1,0 +1,18 @@
+{
+  "matching_programs": [
+    "assistant_hinge_baseline.nir",
+    "assistant_linear_baseline.nir",
+    "implicit_observe.nir",
+    "inference.nir",
+    "integrated.nir",
+    "learning.nir",
+    "minimal.nir",
+    "observe_delta.nir",
+    "optimization_profile.nir",
+    "performance.nir",
+    "pretrained_cartpole.nir"
+  ],
+  "count": 11,
+  "byte_identical_cpp": true,
+  "canonical_ir_identical": true
+}

@@ -17,7 +17,7 @@ import tempfile
 import time
 import torch
 from torch.nn import functional as F
-from train import ByteDialogue, examples
+from train import ByteDialogue, examples, checkpoint_tokenizer, parameter_count, MAX_MATERIALIZED_BYTES
 
 
 def sha256(path):
@@ -29,6 +29,8 @@ def sha256(path):
 
 
 def pairs_from_jsonl(path):
+    if not path.is_file() or path.stat().st_size > MAX_MATERIALIZED_BYTES:
+        raise ValueError('assistant split missing or exceeds 16 MiB materialization bound')
     rows = []
     for line in path.read_text(encoding='utf-8').splitlines():
         if not line.strip():
@@ -54,7 +56,7 @@ def check_splits(train, validation, test):
         raise ValueError('user prompt leakage between training/validation/test')
 
 
-def measure(model, pairs):
+def measure(model, pairs, tokenizer_kind='byte260'):
     model.eval()
     loss_total = 0.0
     tokens_total = 0
@@ -73,8 +75,13 @@ def measure(model, pairs):
     loss = loss_total / tokens_total
     if not math.isfinite(loss):
         raise ValueError('nonfinite validation loss')
-    return {'mean_answer_nll': loss, 'answer_byte_accuracy': correct_total/tokens_total,
-            'answer_bytes_scored': tokens_total}
+    result = {'mean_answer_nll': loss, 'answer_token_accuracy': correct_total/tokens_total,
+              'answer_tokens_scored': tokens_total, 'tokenizer_kind': tokenizer_kind}
+    if tokenizer_kind == 'byte260':
+        # Legacy aliases include EOS, as the original metric did.
+        result.update(answer_byte_accuracy=correct_total/tokens_total,
+                      answer_bytes_scored=tokens_total)
+    return result
 
 
 def run(checkpoint, train_path, val_path, test_path, output, steps=2, rate=5e-5,
@@ -91,14 +98,15 @@ def run(checkpoint, train_path, val_path, test_path, output, steps=2, rate=5e-5,
     torch.set_num_threads(min(torch.get_num_threads(), 4))
     torch.manual_seed(20261110)
     package = torch.load(checkpoint, map_location='cpu', weights_only=True)
+    tokenizer = checkpoint_tokenizer(package)
     cfg = package['architecture']
     model = ByteDialogue(cfg)
     model.load_state_dict(package['state_dict'], strict=True)
-    train_pairs, val_pairs, test_pairs = [examples(p, cfg['context']) for p in (train_path,val_path,test_path)]
+    train_pairs, val_pairs, test_pairs = [examples(p, cfg['context'], tokenizer) for p in (train_path,val_path,test_path)]
     params = sum(p.numel() for p in model.parameters())
-    if params != 55439360:
-        raise ValueError('expected exact 55,439,360-parameter architecture')
-    before = measure(model, val_pairs)
+    if params != parameter_count(cfg):
+        raise ValueError('unexpected architecture parameter count')
+    before = measure(model, val_pairs, tokenizer.kind)
     start = time.perf_counter()
     optimizer = torch.optim.AdamW(model.parameters(), lr=rate)
     model.train()
@@ -112,15 +120,17 @@ def run(checkpoint, train_path, val_path, test_path, output, steps=2, rate=5e-5,
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.)
         optimizer.step()
-    after = measure(model, val_pairs)
+    after = measure(model, val_pairs, tokenizer.kind)
     relative_gain = (before['mean_answer_nll'] - after['mean_answer_nll']) / before['mean_answer_nll']
     decision = 'ACCEPT' if relative_gain >= min_gain and before['mean_answer_nll'] - after['mean_answer_nll'] > 1e-4 else 'REJECT_NO_VALIDATION_GAIN'
-    test_after = measure(model, test_pairs)  # reported only, NOT used for selection
+    test_after = measure(model, test_pairs, tokenizer.kind)  # reported only, NOT used for selection
     evidence = {
         'assistant_method': 'NeuralLanguageAssistant/0.5 evidence gate adapted for byte dialogue',
         'original_assistant_invoked_on_transformer': False,
         'status': 'short_finetuning_experiment_only',
         'architecture_parameters': params, 'baseline_sha256': sha256(checkpoint),
+        'tokenizer_kind': tokenizer.kind, 'vocab_size': tokenizer.vocab_size,
+        'tokenizer_sha256': getattr(tokenizer, 'digest', None),
         'train_sha256': sha256(train_path), 'validation_sha256': sha256(val_path), 'test_sha256': sha256(test_path),
         'rows': {'train': len(rows[0]), 'validation': len(rows[1]), 'test': len(rows[2])},
         'optimizer_steps': steps, 'new_optimizer_state': True, 'rate': rate,
@@ -139,7 +149,8 @@ def run(checkpoint, train_path, val_path, test_path, output, steps=2, rate=5e-5,
         if decision == 'ACCEPT' and save_candidate:
             target = stage / 'candidate.pt'
             torch.save({'architecture': cfg, 'state_dict': model.state_dict(),
-                        'tokenizer': 'byte260', 'trained_steps': package.get('trained_steps',0)+steps}, target)
+                        'tokenizer': tokenizer.metadata(), 'trained_steps': package.get('trained_steps',0)+steps,
+                        'continuation_mode': 'fresh_optimizer_evidence_gate'}, target)
             evidence['candidate_bytes'] = target.stat().st_size
             evidence['candidate_sha256'] = sha256(target)
         (stage/'evidence.json').write_text(json.dumps(evidence, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')

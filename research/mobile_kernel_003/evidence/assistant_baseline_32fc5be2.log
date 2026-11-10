@@ -1,0 +1,162 @@
+Baseline SHA: 32fc5be2a44a2b08dcf875880c7b1f7e7ce42f5a
+Command: PATH=/workspace/nl-toolchains/bin:$PATH python3 -m unittest -v tests.test_assistant
+Isolated git archive language directory: /tmp/nl-assistant-baseline-32jn61cv/language
+Exit: 1
+test_bad_json_and_nonfinite_rejected (tests.test_assistant.AssistantContractTests.test_bad_json_and_nonfinite_rejected) ... ok
+test_existing_output_not_overwritten (tests.test_assistant.AssistantContractTests.test_existing_output_not_overwritten) ... ok
+test_leakage_does_not_pass (tests.test_assistant.AssistantContractTests.test_leakage_does_not_pass) ... ok
+test_learning_requires_observe_and_is_finite (tests.test_assistant.AssistantContractTests.test_learning_requires_observe_and_is_finite) ... ERROR
+test_model_proposal_is_real_graph_and_original_stays_unchanged (tests.test_assistant.AssistantContractTests.test_model_proposal_is_real_graph_and_original_stays_unchanged) ... ERROR
+test_reference_linear_formula (tests.test_assistant.AssistantContractTests.test_reference_linear_formula) ... ok
+test_restricted_source_rejects_hidden_side_effects (tests.test_assistant.AssistantContractTests.test_restricted_source_rejects_hidden_side_effects) ... ok
+test_unexpected_model_format_rejected (tests.test_assistant.AssistantContractTests.test_unexpected_model_format_rejected) ... ok
+test_validation_test_overlap_does_not_pass (tests.test_assistant.AssistantContractTests.test_validation_test_overlap_does_not_pass) ... ok
+test_accept_nonlinear_candidate_and_reference (tests.test_assistant.AssistantNativeTests.test_accept_nonlinear_candidate_and_reference) ... ERROR
+test_clang_compilation_on_both_variants (tests.test_assistant.AssistantNativeTests.test_clang_compilation_on_both_variants) ... ERROR
+test_no_gain_rejects_and_keeps_original (tests.test_assistant.AssistantNativeTests.test_no_gain_rejects_and_keeps_original) ... ERROR
+test_reference_disagreement_blocks_acceptance (tests.test_assistant.AssistantNativeTests.test_reference_disagreement_blocks_acceptance) ... ERROR
+test_resource_gate_rejects_and_does_not_publish (tests.test_assistant.AssistantNativeTests.test_resource_gate_rejects_and_does_not_publish) ... ERROR
+test_test_targets_are_not_used_for_decision (tests.test_assistant.AssistantNativeTests.test_test_targets_are_not_used_for_decision) ... ERROR
+test_unnecessary_graph_is_rejected_on_genuinely_linear_task (tests.test_assistant.AssistantNativeTests.test_unnecessary_graph_is_rejected_on_genuinely_linear_task) ... ERROR
+
+======================================================================
+ERROR: test_learning_requires_observe_and_is_finite (tests.test_assistant.AssistantContractTests.test_learning_requires_observe_and_is_finite)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/tests/test_assistant.py", line 41, in test_learning_requires_observe_and_is_finite
+    collect_training(parse('brain Test {\n senses 2\n neurons out 1 linear\n}\n'
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/compiler.py", line 263, in parse
+    effects=validate_semantics(program)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/compiler.py", line 387, in validate_semantics
+    observed=walk(program,False)
+             ^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/compiler.py", line 370, in walk
+    require_input(op,observed)
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/compiler.py", line 342, in require_input
+    fail(op['line'],f"{op['op']} requires observe before use (input state absent)")
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/compiler.py", line 36, in fail
+    raise CompileError(f"line {line}: {text}")
+compiler.CompileError: line 5: learn requires observe before use (input state absent)
+
+======================================================================
+ERROR: test_model_proposal_is_real_graph_and_original_stays_unchanged (tests.test_assistant.AssistantContractTests.test_model_proposal_is_real_graph_and_original_stays_unchanged)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/tests/test_assistant.py", line 26, in test_model_proposal_is_real_graph_and_original_stays_unchanged
+    candidate=propose_branch(ir, 8)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+======================================================================
+ERROR: test_accept_nonlinear_candidate_and_reference (tests.test_assistant.AssistantNativeTests.test_accept_nonlinear_candidate_and_reference)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/tests/test_assistant.py", line 106, in test_accept_nonlinear_candidate_and_reference
+    record=run_experiment(SOURCE,DATA,output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 257, in run_experiment
+    proposed = propose_branch(ir, width)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+======================================================================
+ERROR: test_clang_compilation_on_both_variants (tests.test_assistant.AssistantNativeTests.test_clang_compilation_on_both_variants)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/tests/test_assistant.py", line 162, in test_clang_compilation_on_both_variants
+    result=run_experiment(SOURCE,DATA,out,compiler='clang++')
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 257, in run_experiment
+    proposed = propose_branch(ir, width)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+======================================================================
+ERROR: test_no_gain_rejects_and_keeps_original (tests.test_assistant.AssistantNativeTests.test_no_gain_rejects_and_keeps_original)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/tests/test_assistant.py", line 139, in test_no_gain_rejects_and_keeps_original
+    result=run_experiment(SOURCE,DATA,out,min_gain=0.999999)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 257, in run_experiment
+    proposed = propose_branch(ir, width)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+======================================================================
+ERROR: test_reference_disagreement_blocks_acceptance (tests.test_assistant.AssistantNativeTests.test_reference_disagreement_blocks_acceptance)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/tests/test_assistant.py", line 171, in test_reference_disagreement_blocks_acceptance
+    run_experiment(SOURCE,DATA,out)
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 257, in run_experiment
+    proposed = propose_branch(ir, width)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+======================================================================
+ERROR: test_resource_gate_rejects_and_does_not_publish (tests.test_assistant.AssistantNativeTests.test_resource_gate_rejects_and_does_not_publish)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/tests/test_assistant.py", line 129, in test_resource_gate_rejects_and_does_not_publish
+    result=run_experiment(SOURCE,DATA,out,max_weights=10)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 257, in run_experiment
+    proposed = propose_branch(ir, width)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+======================================================================
+ERROR: test_test_targets_are_not_used_for_decision (tests.test_assistant.AssistantNativeTests.test_test_targets_are_not_used_for_decision)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/tests/test_assistant.py", line 151, in test_test_targets_are_not_used_for_decision
+    first=run_experiment(SOURCE,DATA,d/'regular')
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 257, in run_experiment
+    proposed = propose_branch(ir, width)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+======================================================================
+ERROR: test_unnecessary_graph_is_rejected_on_genuinely_linear_task (tests.test_assistant.AssistantNativeTests.test_unnecessary_graph_is_rejected_on_genuinely_linear_task)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/tests/test_assistant.py", line 121, in test_unnecessary_graph_is_rejected_on_genuinely_linear_task
+    result=run_experiment(LINEAR_SOURCE,LINEAR_DATA,out)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 257, in run_experiment
+    proposed = propose_branch(ir, width)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/nl-assistant-baseline-32jn61cv/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.016s
+
+FAILED (errors=9)

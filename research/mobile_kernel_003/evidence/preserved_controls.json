@@ -1,0 +1,22 @@
+{
+  "verified_unchanged": [
+    "language/examples/performance.nir",
+    "language/examples/graph_sensor.nir",
+    "language/examples/optimization_profile.nir",
+    "language/examples/implicit_observe.nir",
+    "language/examples/minimal.nir",
+    "language/examples/assistant_hinge_baseline.nir",
+    "language/examples/pretrained_cartpole.nir",
+    "language/examples/self_check.nir",
+    "language/examples/assistant_linear_baseline.nir",
+    "language/examples/integrated.nir",
+    "language/examples/learning.nir",
+    "language/examples/observe_delta.nir",
+    "language/examples/inference.nir",
+    "research/agent_pilot/models/cartpole_pretrained.nlw",
+    "research/nl_train_001/models/har_model.nlw",
+    "research/nl_train_001/models/har_initial.nlw"
+  ],
+  "main_sha": "1168f3fcc2ecd0bd17de08be69d313844790c845",
+  "base_sha": "32fc5be2a44a2b08dcf875880c7b1f7e7ce42f5a"
+}

@@ -1,0 +1,31 @@
+{
+  "base_sha": "32fc5be2a44a2b08dcf875880c7b1f7e7ce42f5a",
+  "native_command": "cd language && PATH=/workspace/nl-toolchains/bin:$PATH /workspace/nl-dev-venv/bin/python -m unittest discover -s tests -v",
+  "native_tests": 134,
+  "native_failures": 0,
+  "native_errors": 0,
+  "native_skipped": 0,
+  "dialogue_command": "cd research/dialogue_55m && /workspace/nl-dev-venv/bin/python -m unittest -v test_tokenizer test_training_tokenizer test_assistant_dialogue",
+  "dialogue_tests": 15,
+  "dialogue_failures": 0,
+  "hardware": "Linux x86-64, CPU only",
+  "compilers": {
+    "gcc": "g++ (Debian 14.2.0-19) 14.2.0",
+    "clang": "Debian clang version 19.1.7 (3+b1)"
+  },
+  "android_cross_compiled": true,
+  "android_device_executed": false,
+  "github_actions_run": false,
+  "notes": [
+    "Native first full run134 tests/9 existing Assistant errors; baseline Assistant16 tests/9 errors reproduced. After compatibility fix full suite134 PASS.",
+    "BPE smoke model55,630,656 parameters; one fresh synthetic sample/step, not trained conversation.",
+    "Exact optimizer resume covered on small test models, no CUDA test."
+  ],
+  "files_sha256": {
+    "language/runtime/neural_dataset.hpp": "a4f03288ead2cc230ff110aff40bb0f010507fea51e6777f68edb3803fae3c59",
+    "language/runtime/mobile_plan.hpp": "0d23b22cdc7a06b383b7eb9c23d261188248a282f2fd722d6ed07ffda33f57fb",
+    "language/runtime/neural_runtime.hpp": "f7d5b109e32854aab86c6fbcf005a49e7e496118334379d27335722f8e4facb4",
+    "language/compiler.py": "015de8887e5cff9d0604babacf15b33bf5535d7670d2b4e890f8bb233708ad14",
+    "language/assistant.py": "d4ff7c152a0d47ab8a081bda9cddf6056f905fe9cba433c8c92939c2730b0dbe"
+  }
+}

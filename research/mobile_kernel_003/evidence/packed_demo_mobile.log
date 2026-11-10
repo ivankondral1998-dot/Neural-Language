@@ -1,0 +1,7 @@
+PREDICT version=0 values=-0.03516209916,0.1613588367
+PREDICT version=1 values=-0.03516209916,0.1613588367
+PREDICT version=2 values=-0.03516209916,0.1613588367
+REPORT packed_sensor.json
+COMPILED IR: /workspace/Neural-Language/runs/native-packed-demo/mobile/demo.nir.json
+COMPILER ADVICE: INT8 uses fixed scale 1/127; small training steps can round to zero; validate convergence separately.; Sparse mutation is supported; measure before assuming a runtime advantage.; No native advise command; strategy performance has not been measured.; mobile-cpu plan specializes sequential dense FP64 arithmetic with packed INT8 storage dequantized per term: four independent rows, same left-to-right reduction as FULL. Not native INT8 dot products and not a phone measurement.
+BUILT: /workspace/Neural-Language/runs/native-packed-demo/mobile/demo

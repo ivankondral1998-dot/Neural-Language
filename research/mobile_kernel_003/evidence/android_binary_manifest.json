@@ -1,0 +1,22 @@
+{
+  "compiler": "Android (16134705, +pgo, +bolt, +lto, +mlgo, based on r574158c) clang version 21.0.0 (https://android.googlesource.com/toolchain/llvm-project 9f872551d3c681d06fd303b36f16ed5c274735eb)",
+  "flags": [
+    "-std=c++17",
+    "-O3",
+    "-ffp-contract=off",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-static-libstdc++",
+    "-fPIE",
+    "-pie"
+  ],
+  "target": "Android API26 AArch64",
+  "device_executed": false,
+  "sha256": {
+    "before": "4b51dde33b9301ef72a6d1efb16f8edebedaffe78d950c0cc4592c1fd5baef50",
+    "after": "25dd02f44332f96a66a2daaeea3ef7f768aea508f4bbc6ab9525aa702980f4c2",
+    "int8": "fca3f623473943f1bd5d78101c02a476f64ef2c12c7d351f14183952ad96e125",
+    "packed-demo": "02714657529a61d4c34aa8f364dcd0b6e7f27517aedd0b3f704c80700c29df05"
+  }
+}

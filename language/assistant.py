@@ -126,7 +126,7 @@ def propose_branch(ir: dict, width: int):
     """A structured Neural IR transformation, NOT textual source substitution."""
     b = ir['brain']
     layers = b['neurons']
-    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+    if b.get('graph', False) or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
         raise ExperimentError('v0.5 proposal supports only a single FP64 linear output layer')
     if width < 2 or width > 32:
         raise ExperimentError('candidate width must be in 2..32')

@@ -6,6 +6,12 @@ Base: \`opt/nl-mobile-opt-002-reuse-input-20261110\` at \`5cf5e5b9c96455903c8d89
 
 The model is a 10-block causal transformer, width 768, 12 heads, FFN 2048, context 128, tied embedding, vocabulary 260 (UTF-8 bytes + separators). **55,439,360 trainable parameters**, not the normative 55,451,639-parameter UNO-B2 design.
 
+An explicitly optional [BPE training profile](TOKENIZER_PROFILE.md) adds portable
+tokenizer metadata, a 1024-token context, streamed JSONL training and exact
+optimizer/RNG resume. The original byte260 profile and old checkpoints remain
+supported. This is still the isolated PyTorch backend; it does not extend the
+native `.nir` compiler or prove useful conversation.
+
 Commands from repository root:
 
 \`\`\`bash

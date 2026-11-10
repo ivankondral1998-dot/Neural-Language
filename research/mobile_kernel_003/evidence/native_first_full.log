@@ -1,0 +1,280 @@
+test_bad_json_and_nonfinite_rejected (test_assistant.AssistantContractTests.test_bad_json_and_nonfinite_rejected) ... ok
+test_existing_output_not_overwritten (test_assistant.AssistantContractTests.test_existing_output_not_overwritten) ... ok
+test_leakage_does_not_pass (test_assistant.AssistantContractTests.test_leakage_does_not_pass) ... ok
+test_learning_requires_observe_and_is_finite (test_assistant.AssistantContractTests.test_learning_requires_observe_and_is_finite) ... ERROR
+test_model_proposal_is_real_graph_and_original_stays_unchanged (test_assistant.AssistantContractTests.test_model_proposal_is_real_graph_and_original_stays_unchanged) ... ERROR
+test_reference_linear_formula (test_assistant.AssistantContractTests.test_reference_linear_formula) ... ok
+test_restricted_source_rejects_hidden_side_effects (test_assistant.AssistantContractTests.test_restricted_source_rejects_hidden_side_effects) ... ok
+test_unexpected_model_format_rejected (test_assistant.AssistantContractTests.test_unexpected_model_format_rejected) ... ok
+test_validation_test_overlap_does_not_pass (test_assistant.AssistantContractTests.test_validation_test_overlap_does_not_pass) ... ok
+test_accept_nonlinear_candidate_and_reference (test_assistant.AssistantNativeTests.test_accept_nonlinear_candidate_and_reference) ... ERROR
+test_clang_compilation_on_both_variants (test_assistant.AssistantNativeTests.test_clang_compilation_on_both_variants) ... ERROR
+test_no_gain_rejects_and_keeps_original (test_assistant.AssistantNativeTests.test_no_gain_rejects_and_keeps_original) ... ERROR
+test_reference_disagreement_blocks_acceptance (test_assistant.AssistantNativeTests.test_reference_disagreement_blocks_acceptance) ... ERROR
+test_resource_gate_rejects_and_does_not_publish (test_assistant.AssistantNativeTests.test_resource_gate_rejects_and_does_not_publish) ... ERROR
+test_test_targets_are_not_used_for_decision (test_assistant.AssistantNativeTests.test_test_targets_are_not_used_for_decision) ... ERROR
+test_unnecessary_graph_is_rejected_on_genuinely_linear_task (test_assistant.AssistantNativeTests.test_unnecessary_graph_is_rejected_on_genuinely_linear_task) ... ERROR
+test_bad_graphs_fail_before_compilation (test_dag_changes.DAGShapeAndChanges.test_bad_graphs_fail_before_compilation) ... ok
+test_checkpoint_reload_and_topology_guard (test_dag_changes.DAGShapeAndChanges.test_checkpoint_reload_and_topology_guard) ... ok
+test_codegen_rejects_dag_operations_even_with_recomputed_effects (test_dag_changes.DAGShapeAndChanges.test_codegen_rejects_dag_operations_even_with_recomputed_effects) ... ok
+test_codegen_reports_malformed_ir_as_compile_error (test_dag_changes.DAGShapeAndChanges.test_codegen_reports_malformed_ir_as_compile_error) ... ok
+test_graph_shapes_and_edges (test_dag_changes.DAGShapeAndChanges.test_graph_shapes_and_edges) ... ok
+test_invalid_graph_benchmark_commands_do_not_run (test_dag_changes.DAGShapeAndChanges.test_invalid_graph_benchmark_commands_do_not_run) ... ok
+test_mutated_ir_fails_controlled (test_dag_changes.DAGShapeAndChanges.test_mutated_ir_fails_controlled) ... ok
+test_native_graph_execution_and_checkpoints (test_dag_changes.DAGShapeAndChanges.test_native_graph_execution_and_checkpoints) ... ok
+test_native_independent_dag_oracle_stress (test_dag_changes.DAGShapeAndChanges.test_native_independent_dag_oracle_stress) ... ok
+test_sequential_explicit_parent_remains_legacy (test_dag_changes.DAGShapeAndChanges.test_sequential_explicit_parent_remains_legacy) ... ok
+test_snapshot_and_effect_lifetimes (test_dag_changes.DAGShapeAndChanges.test_snapshot_and_effect_lifetimes) ... ok
+test_bad_source_and_mutated_ir (test_dataset_training.DatasetTrainingTests.test_bad_source_and_mutated_ir) ... ok
+test_ir_typed_effects_and_budget (test_dataset_training.DatasetTrainingTests.test_ir_typed_effects_and_budget) ... ok
+test_native_train_repeat_load_and_bad_data (test_dataset_training.DatasetTrainingTests.test_native_train_repeat_load_and_bad_data) ... ok
+test_duplicate_and_loop_checkpoints_rejected (test_effects_changes_integration.EffectContractTests.test_duplicate_and_loop_checkpoints_rejected) ... ok
+test_effect_metadata_checked_prior_to_native_emit (test_effects_changes_integration.EffectContractTests.test_effect_metadata_checked_prior_to_native_emit) ... ok
+test_no_cpp_codegen_change_for_previous_valid_program (test_effects_changes_integration.EffectContractTests.test_no_cpp_codegen_change_for_previous_valid_program) ... ok
+test_restored_snapshot_native_matches_full_oracle (test_effects_changes_integration.EffectContractTests.test_restored_snapshot_native_matches_full_oracle) ... ok
+test_restoring_input_snapshot_enables_delta (test_effects_changes_integration.EffectContractTests.test_restoring_input_snapshot_enables_delta) ... ok
+test_restoring_unbound_snapshot_rejects_delta (test_effects_changes_integration.EffectContractTests.test_restoring_unbound_snapshot_rejects_delta) ... ok
+test_rewinding_missing_checkpoint_rejected (test_effects_changes_integration.EffectContractTests.test_rewinding_missing_checkpoint_rejected) ... ok
+test_second_iteration_after_restore_unbound_snapshot_rejected (test_effects_changes_integration.EffectContractTests.test_second_iteration_after_restore_unbound_snapshot_rejected) ... ok
+test_second_iteration_with_bound_snapshot_accepted (test_effects_changes_integration.EffectContractTests.test_second_iteration_with_bound_snapshot_accepted) ... ok
+test_all_storage_masks_graphs_activations_and_failure_recovery (test_full_overwrite.FullOverwrite.test_all_storage_masks_graphs_activations_and_failure_recovery) ... ok
+test_dangling_symlink_report_not_followed (test_hardening.HardeningTests.test_dangling_symlink_report_not_followed) ... ok
+test_expect_nan_rejected_in_runtime (test_hardening.HardeningTests.test_expect_nan_rejected_in_runtime) ... ok
+test_invalid_unicode_escape_is_compile_error (test_hardening.HardeningTests.test_invalid_unicode_escape_is_compile_error) ... ok
+test_report_bidi_rejected (test_hardening.HardeningTests.test_report_bidi_rejected) ... ok
+test_report_newline_rejected (test_hardening.HardeningTests.test_report_newline_rejected) ... ok
+test_report_safe_unicode (test_hardening.HardeningTests.test_report_safe_unicode) ... ok
+test_report_utf8_byte_limit (test_hardening.HardeningTests.test_report_utf8_byte_limit) ... ok
+test_very_large_integer_is_compile_error (test_hardening.HardeningTests.test_very_large_integer_is_compile_error) ... ok
+test_bad_optimize_range_rejected (test_integration.IntegratedSyntax.test_bad_optimize_range_rejected) ... ok
+test_bad_validation_input_rejected (test_integration.IntegratedSyntax.test_bad_validation_input_rejected) ... ok
+test_bad_validation_target_rejected (test_integration.IntegratedSyntax.test_bad_validation_target_rejected) ... ok
+test_negative_tolerance_rejected (test_integration.IntegratedSyntax.test_negative_tolerance_rejected) ... ok
+test_ops_present_in_ir_and_native_cpp (test_integration.IntegratedSyntax.test_ops_present_in_ir_and_native_cpp) ... ok
+test_evaluation_not_training (test_integration.IntegrationRuntime.test_evaluation_not_training) ... ok
+test_failed_validation_stops_pipeline (test_integration.IntegrationRuntime.test_failed_validation_stops_pipeline) ... ok
+test_integrated_native_clang (test_integration.IntegrationRuntime.test_integrated_native_clang) ... ok
+test_integrated_native_gcc (test_integration.IntegrationRuntime.test_integrated_native_gcc) ... ok
+test_optimizer_does_not_change_weights (test_integration.IntegrationRuntime.test_optimizer_does_not_change_weights) ... ok
+test_compiler_rejects_model_traversal (test_integration.PersistentWeightsTests.test_compiler_rejects_model_traversal) ... ok
+test_missing_and_truncated_model_rejected (test_integration.PersistentWeightsTests.test_missing_and_truncated_model_rejected) ... ok
+test_roundtrip_two_native_executables (test_integration.PersistentWeightsTests.test_roundtrip_two_native_executables) ... ok
+test_save_and_load_masks_biases_int8 (test_integration.PersistentWeightsTests.test_save_and_load_masks_biases_int8) ... ok
+test_bad_index_rejected (test_language.CompilerTests.test_bad_index_rejected) ... ok
+test_bounded_resources (test_language.CompilerTests.test_bounded_resources) ... ok
+test_cpp_not_scripting_layer (test_language.CompilerTests.test_cpp_not_scripting_layer) ... ok
+test_duplicate_layer_rejected (test_language.CompilerTests.test_duplicate_layer_rejected) ... ok
+test_enormous_loop_rejected (test_language.CompilerTests.test_enormous_loop_rejected) ... ok
+test_learning_rate_rejected (test_language.CompilerTests.test_learning_rate_rejected) ... ok
+test_no_python_expression_in_vectors (test_language.CompilerTests.test_no_python_expression_in_vectors) ... ok
+test_parse_minimal (test_language.CompilerTests.test_parse_minimal) ... ok
+test_path_traversal_rejected (test_language.CompilerTests.test_path_traversal_rejected) ... ok
+test_shape_rejected_at_compile (test_language.CompilerTests.test_shape_rejected_at_compile) ... ok
+test_target_shape_rejected (test_language.CompilerTests.test_target_shape_rejected) ... ok
+test_unclosed_cycle_rejected (test_language.CompilerTests.test_unclosed_cycle_rejected) ... ok
+test_unknown_instruction_rejected (test_language.CompilerTests.test_unknown_instruction_rejected) ... ok
+test_unknown_weight_rejected (test_language.CompilerTests.test_unknown_weight_rejected) ... ok
+test_expect_checks_result (test_language.NativeTests.test_expect_checks_result) ... ok
+test_failure_does_not_change_original_source (test_language.NativeTests.test_failure_does_not_change_original_source) ... ok
+test_native_advisor_does_not_mutate_model (test_language.NativeTests.test_native_advisor_does_not_mutate_model) ... ok
+test_real_learning_and_output (test_language.NativeTests.test_real_learning_and_output) ... ok
+test_relu_crossing_and_snapshot (test_language.NativeTests.test_relu_crossing_and_snapshot) ... ok
+test_sparse_vs_full_three_layer (test_language.NativeTests.test_sparse_vs_full_three_layer) ... ok
+test_checkpoint_duplicate_rejected (test_language.PreservationTests.test_checkpoint_duplicate_rejected) ... ok
+test_repeated_run_keeps_first_report (test_language.PreservationTests.test_repeated_run_keeps_first_report) ... ok
+test_generic_emit_has_no_plan (test_mobile_plan.PlanIr.test_generic_emit_has_no_plan) ... ok
+test_graph_rejected (test_mobile_plan.PlanIr.test_graph_rejected) ... ok
+test_mixed_storage_plan_describes_fp64_dequantization (test_mobile_plan.PlanIr.test_mixed_storage_plan_describes_fp64_dequantization) ... ok
+test_mobile_dataset_uses_full_buffer_reuse (test_mobile_plan.PlanIr.test_mobile_dataset_uses_full_buffer_reuse) ... ok
+test_mobile_plan_records_shapes_and_contract (test_mobile_plan.PlanIr.test_mobile_plan_records_shapes_and_contract) ... ok
+test_input_reuse_matches_full_without_reallocation (test_mobile_plan.PlanNative.test_input_reuse_matches_full_without_reallocation) ... ok
+test_mixed_compiled_nir_matches_generic_weights_and_fallback (test_mobile_plan.PlanNative.test_mixed_compiled_nir_matches_generic_weights_and_fallback) ... ok
+test_mixed_plan_native_numerics_and_fallback (test_mobile_plan.PlanNative.test_mixed_plan_native_numerics_and_fallback) ... ok
+test_mobile_dataset_prediction_matches_generic (test_mobile_plan.PlanNative.test_mobile_dataset_prediction_matches_generic) ... ok
+test_predict_matches_generic_and_plan_runs (test_mobile_plan.PlanNative.test_predict_matches_generic_and_plan_runs) ... ok
+test_training_weights_match_generic (test_mobile_plan.PlanNative.test_training_weights_match_generic) ... ok
+test_cycle_accepted_after_observation (test_observe_delta.CompilerDelta.test_cycle_accepted_after_observation) ... ok
+test_ir_contract_and_output (test_observe_delta.CompilerDelta.test_ir_contract_and_output) ... ok
+test_legacy_cpp_identical_to_frozen_golden (test_observe_delta.CompilerDelta.test_legacy_cpp_identical_to_frozen_golden) ... ok
+test_static_invalid_programs (test_observe_delta.CompilerDelta.test_static_invalid_programs) ... ok
+test_tampered_neural_ir_rejected_before_codegen (test_observe_delta.CompilerDelta.test_tampered_neural_ir_rejected_before_codegen) ... ok
+test_gcc_and_clang_compiled_programs_equivalent (test_observe_delta.NativeDelta.test_gcc_and_clang_compiled_programs_equivalent) ... ok
+test_gcc_clang_randomized_oracle_stress (test_observe_delta.NativeDelta.test_gcc_clang_randomized_oracle_stress) ... ok
+test_existing_nir_syntax_and_native_report (test_observe_reuse.AutomaticObserveReuse.test_existing_nir_syntax_and_native_report) ... ok
+test_independent_stress_both_compilers (test_observe_reuse.AutomaticObserveReuse.test_independent_stress_both_compilers) ... ok
+test_no_new_grammar_and_existing_ir (test_observe_reuse.AutomaticObserveReuse.test_no_new_grammar_and_existing_ir) ... ok
+test_budget_explicit_forward_macs (test_quantization_fixes.FixedCompilerTests.test_budget_explicit_forward_macs) ... ok
+test_budget_includes_gate_and_cache (test_quantization_fixes.FixedCompilerTests.test_budget_includes_gate_and_cache) ... ok
+test_byte_counts_and_ir_types (test_quantization_fixes.FixedCompilerTests.test_byte_counts_and_ir_types) ... ok
+test_float_only_unaffected (test_quantization_fixes.FixedCompilerTests.test_float_only_unaffected) ... ok
+test_cpp_int8_no_shadow_numerical_and_checkpoint (test_quantization_fixes.NativeInt8Tests.test_cpp_int8_no_shadow_numerical_and_checkpoint) ... ok
+test_canonical_full_delta_trajectory (test_semantic_safety.AuditSemanticSafety.test_canonical_full_delta_trajectory)
+720 ticks x 4 topologies, checking every activation and preactivation. ... ok
+test_compiled_nir_cancellation (test_semantic_safety.AuditSemanticSafety.test_compiled_nir_cancellation)
+The actual .nir surface must not print 0 for a canonical value 5. ... ok
+test_compiled_nir_subtle_cancellation (test_semantic_safety.AuditSemanticSafety.test_compiled_nir_subtle_cancellation)
+The default incremental path must reject a >2-unit rounding error. ... ok
+test_cpp_runtime_counterexamples (test_semantic_safety.AuditSemanticSafety.test_cpp_runtime_counterexamples)
+Covers sequence/DAG AUTO+DELTA, mode, mixed orders, and sequential/DAG SGD. ... ok
+test_compiled_nir_below_heuristic_cutoff (test_semantic_safety.StrictNumericContract.test_compiled_nir_below_heuristic_cutoff) ... ok
+test_compiled_nir_blas_backend_transition (test_semantic_safety.StrictNumericContract.test_compiled_nir_blas_backend_transition) ... ok
+test_compiled_nir_hidden_cancellation (test_semantic_safety.StrictNumericContract.test_compiled_nir_hidden_cancellation) ... ok
+test_combined_metadata_is_consistent (test_shapes_changes_integration.ShapesEffectsChanges.test_combined_metadata_is_consistent) ... ok
+test_delta_and_weight_operand_mutations (test_shapes_changes_integration.ShapesEffectsChanges.test_delta_and_weight_operand_mutations) ... ok
+test_filename_guards (test_shapes_changes_integration.ShapesEffectsChanges.test_filename_guards) ... ok
+test_frozen_cpp_golden (test_shapes_changes_integration.ShapesEffectsChanges.test_frozen_cpp_golden) ... ok
+test_input_shapes_and_numeric_value_types (test_shapes_changes_integration.ShapesEffectsChanges.test_input_shapes_and_numeric_value_types) ... ok
+test_json_roundtrip_and_legacy_ir_without_shapes (test_shapes_changes_integration.ShapesEffectsChanges.test_json_roundtrip_and_legacy_ir_without_shapes) ... ok
+test_malformed_checkpoint_label_is_compile_error_not_python_error (test_shapes_changes_integration.ShapesEffectsChanges.test_malformed_checkpoint_label_is_compile_error_not_python_error) ... ok
+test_metadata_tamper (test_shapes_changes_integration.ShapesEffectsChanges.test_metadata_tamper) ... ok
+test_mutated_brain_fields (test_shapes_changes_integration.ShapesEffectsChanges.test_mutated_brain_fields) ... ok
+test_mutated_layers (test_shapes_changes_integration.ShapesEffectsChanges.test_mutated_layers) ... ok
+test_mutated_operation_lifetime_and_count (test_shapes_changes_integration.ShapesEffectsChanges.test_mutated_operation_lifetime_and_count) ... ok
+test_randomized_dense_shape_oracle (test_shapes_changes_integration.ShapesEffectsChanges.test_randomized_dense_shape_oracle) ... ok
+test_mutation_detects_old_int8_rounding_defect (test_verifier.VerifierTests.test_mutation_detects_old_int8_rounding_defect) ... ok
+test_nir_executes_and_preserves_outputs (test_verifier.VerifierTests.test_nir_executes_and_preserves_outputs) ... ok
+test_parser_and_ir (test_verifier.VerifierTests.test_parser_and_ir) ... ok
+test_reject_invalid_verify_limits (test_verifier.VerifierTests.test_reject_invalid_verify_limits) ... ok
+test_release_build_rejects_nan_and_infinity (test_verifier.VerifierTests.test_release_build_rejects_nan_and_infinity) ... ok
+
+======================================================================
+ERROR: test_learning_requires_observe_and_is_finite (test_assistant.AssistantContractTests.test_learning_requires_observe_and_is_finite)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/Neural-Language/language/tests/test_assistant.py", line 41, in test_learning_requires_observe_and_is_finite
+    collect_training(parse('brain Test {\n senses 2\n neurons out 1 linear\n}\n'
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/compiler.py", line 263, in parse
+    effects=validate_semantics(program)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/compiler.py", line 387, in validate_semantics
+    observed=walk(program,False)
+             ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/compiler.py", line 370, in walk
+    require_input(op,observed)
+  File "/workspace/Neural-Language/language/compiler.py", line 342, in require_input
+    fail(op['line'],f"{op['op']} requires observe before use (input state absent)")
+  File "/workspace/Neural-Language/language/compiler.py", line 36, in fail
+    raise CompileError(f"line {line}: {text}")
+compiler.CompileError: line 5: learn requires observe before use (input state absent)
+
+======================================================================
+ERROR: test_model_proposal_is_real_graph_and_original_stays_unchanged (test_assistant.AssistantContractTests.test_model_proposal_is_real_graph_and_original_stays_unchanged)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/Neural-Language/language/tests/test_assistant.py", line 26, in test_model_proposal_is_real_graph_and_original_stays_unchanged
+    candidate=propose_branch(ir, 8)
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+======================================================================
+ERROR: test_accept_nonlinear_candidate_and_reference (test_assistant.AssistantNativeTests.test_accept_nonlinear_candidate_and_reference)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/Neural-Language/language/tests/test_assistant.py", line 106, in test_accept_nonlinear_candidate_and_reference
+    record=run_experiment(SOURCE,DATA,output)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/assistant.py", line 257, in run_experiment
+    proposed = propose_branch(ir, width)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+======================================================================
+ERROR: test_clang_compilation_on_both_variants (test_assistant.AssistantNativeTests.test_clang_compilation_on_both_variants)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/Neural-Language/language/tests/test_assistant.py", line 162, in test_clang_compilation_on_both_variants
+    result=run_experiment(SOURCE,DATA,out,compiler='clang++')
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/assistant.py", line 257, in run_experiment
+    proposed = propose_branch(ir, width)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+======================================================================
+ERROR: test_no_gain_rejects_and_keeps_original (test_assistant.AssistantNativeTests.test_no_gain_rejects_and_keeps_original)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/Neural-Language/language/tests/test_assistant.py", line 139, in test_no_gain_rejects_and_keeps_original
+    result=run_experiment(SOURCE,DATA,out,min_gain=0.999999)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/assistant.py", line 257, in run_experiment
+    proposed = propose_branch(ir, width)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+======================================================================
+ERROR: test_reference_disagreement_blocks_acceptance (test_assistant.AssistantNativeTests.test_reference_disagreement_blocks_acceptance)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/Neural-Language/language/tests/test_assistant.py", line 171, in test_reference_disagreement_blocks_acceptance
+    run_experiment(SOURCE,DATA,out)
+  File "/workspace/Neural-Language/language/assistant.py", line 257, in run_experiment
+    proposed = propose_branch(ir, width)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+======================================================================
+ERROR: test_resource_gate_rejects_and_does_not_publish (test_assistant.AssistantNativeTests.test_resource_gate_rejects_and_does_not_publish)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/Neural-Language/language/tests/test_assistant.py", line 129, in test_resource_gate_rejects_and_does_not_publish
+    result=run_experiment(SOURCE,DATA,out,max_weights=10)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/assistant.py", line 257, in run_experiment
+    proposed = propose_branch(ir, width)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+======================================================================
+ERROR: test_test_targets_are_not_used_for_decision (test_assistant.AssistantNativeTests.test_test_targets_are_not_used_for_decision)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/Neural-Language/language/tests/test_assistant.py", line 151, in test_test_targets_are_not_used_for_decision
+    first=run_experiment(SOURCE,DATA,d/'regular')
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/assistant.py", line 257, in run_experiment
+    proposed = propose_branch(ir, width)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+======================================================================
+ERROR: test_unnecessary_graph_is_rejected_on_genuinely_linear_task (test_assistant.AssistantNativeTests.test_unnecessary_graph_is_rejected_on_genuinely_linear_task)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/Neural-Language/language/tests/test_assistant.py", line 121, in test_unnecessary_graph_is_rejected_on_genuinely_linear_task
+    result=run_experiment(LINEAR_SOURCE,LINEAR_DATA,out)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/assistant.py", line 257, in run_experiment
+    proposed = propose_branch(ir, width)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Neural-Language/language/assistant.py", line 129, in propose_branch
+    if b['graph'] or len(layers) != 1 or layers[0]['activation'] != 'linear' or layers[0]['storage'] != 'float':
+       ~^^^^^^^^^
+KeyError: 'graph'
+
+----------------------------------------------------------------------
+Ran 134 tests in 221.453s
+
+FAILED (errors=9)
