@@ -42,6 +42,70 @@ class DatasetTrainingTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(compiler.CompileError):
                 compiler.emit(edited)
 
+    def test_vector_target_contract_and_invalid_modes(self):
+        source = BRAIN + 'train_data "train.txt" samples 4 epochs 80 rate 0.1 seed 17 targets vector\n'
+        ir = compiler.parse(source)
+        self.assertEqual(ir["shape_contract"]["operation_signatures"]["train_data"]["targets"],
+                         {"dtype": "f64", "shape": [2]})
+        self.assertNotIn("label", ir["shape_contract"]["operation_signatures"]["train_data"])
+        self.assertIn('neural::train_data(brain,"train.txt",4,80,0.10000000000000001,17u,true)',
+                      compiler.emit(ir))
+        altered = copy.deepcopy(ir)
+        altered["operations"][0]["target_mode"] = "something_else"
+        with self.assertRaises(compiler.CompileError):
+            compiler.emit(altered)
+        altered = copy.deepcopy(ir)
+        altered["operations"][0]["target_mode"] = False
+        with self.assertRaises(compiler.CompileError):
+            compiler.emit(altered)
+        with self.assertRaises(compiler.CompileError):
+            compiler.parse(BRAIN + 'predict_data "test.txt" samples 4 targets vector\n')
+        # Single-output regression is valid; one-hot classification needs >=2 classes.
+        single = "brain Data {\n senses 2\n neurons out 1 linear\n init 42\n}\n"
+        self.assertIn("targets", compiler.parse(single + source.split("}\n")[-1])["shape_contract"]["operation_signatures"]["train_data"])
+        with self.assertRaises(compiler.CompileError):
+            compiler.parse(single + 'train_data "train.txt" samples 4 epochs 80 rate 0.1 seed 17\n')
+
+    def test_native_vector_targets_learn_reload_and_bad_rows(self):
+        regress = 'train_data "targets.txt" samples 4 epochs 80 rate 0.1 seed 17 targets vector\n'
+        infer = 'predict_data "features.txt" samples 4\n'
+        targets = "0 0 0 0\n0 1 0 1\n1 0 1 0\n1 1 1 1\n"
+        features = "0 0\n0 1\n1 0\n1 1\n"
+        for cxx in ("g++", "clang++"):
+            if not shutil.which(cxx):
+                self.skipTest(f"{cxx} unavailable")
+            with self.subTest(compiler=cxx), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                trainer = self.build(root, "fit", BRAIN + regress + 'save_model "weights.nlw"\n', cxx)
+                predict = self.build(root, "predict", BRAIN + 'load_model "weights.nlw"\n' + infer, cxx)
+                for run_name in ("first", "repeat"):
+                    wd = root / run_name
+                    wd.mkdir()
+                    (wd / "targets.txt").write_text(targets)
+                    (wd / "features.txt").write_text(features)
+                    learned = self.run_native(trainer, wd)
+                    self.assertEqual(learned.returncode, 0, learned.stdout + learned.stderr)
+                    self.assertIn("steps=320", learned.stdout)
+                    prediction = self.run_native(predict, wd)
+                    self.assertEqual(prediction.returncode, 0, prediction.stdout + prediction.stderr)
+                    vals = [list(map(float, line.split("values=")[1].split(",")))
+                            for line in prediction.stdout.splitlines() if "DATA_PREDICT index=" in line]
+                    self.assertEqual(len(vals), 4)
+                    for row, actual in zip(((0, 0), (0, 1), (1, 0), (1, 1)), vals):
+                        self.assertLess(max(abs(got - goal) for got, goal in zip(actual, row)), 0.08)
+                self.assertEqual((root / "first/weights.nlw").read_bytes(),
+                                 (root / "repeat/weights.nlw").read_bytes())
+                invalid = root / "invalid"
+                invalid.mkdir()
+                for content in ("0 0 0 0\n", "0 0 0 0\n1 1 1\n0 1 0 1\n1 0 1 0\n",
+                                "0 0 0 0\n1 1 NaN 1\n0 1 0 1\n1 0 1 0\n",
+                                "0 0 0 0\n1 1 1 1 2\n0 1 0 1\n1 0 1 0\n"):
+                    (invalid / "targets.txt").write_text(content)
+                    result = self.run_native(trainer, invalid)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("dataset", result.stderr)
+                    self.assertFalse((invalid / "weights.nlw").exists())
+
     def build(self, root, name, source, cxx):
         path = root / (name + ".nir")
         path.write_text(source)
