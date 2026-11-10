@@ -149,7 +149,7 @@ tune full
 predict_data "rows.txt" samples 4
 report "rows_report.json"
 """
-        rows = "0 0 0\\n0.2 -0.1 0.5\\n-0.3 0.4 -0.2\\n0.2 -0.1 0.5\\n"
+        rows = "0 0 0\n0.2 -0.1 0.5\n-0.3 0.4 -0.2\n0.2 -0.1 0.5\n"
         with tempfile.TemporaryDirectory(prefix='nl_reuse_data_') as tmp:
             outputs = {}
             for name, profile in (('generic', 'generic'), ('mobile', 'mobile-cpu')):
