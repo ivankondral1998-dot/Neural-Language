@@ -57,19 +57,33 @@ static void check_cancellation(bool graph, neural::Model::Mode mode) {
   near(faster.infer(false)[0], 5., "FULL after mode switch");
 }
 static void check_mode_switch_recomputes() {
-  auto model = cancellation(false, neural::Model::DELTA);
+  auto strict = cancellation(false, neural::Model::DELTA);
   std::vector<double> x(1024, 0.);
-  x[0] = .5;
-  x[1] = .25;
-  model.observe(x);
-  model.infer(false);
-  model.change_input(0, .01);
-  model.infer(false);
-  const size_t before = model.counters.full;
-  model.mode = neural::Model::FULL;
-  model.infer(false);
-  require_test(model.counters.full == before+1,
-               "switch to FULL must canonicalize noncanonical cache");
+  x[0] = .5; x[1] = .25;
+  strict.observe(x);
+  strict.infer(false);
+  strict.change_input(0, .01);
+  const double strict_value = strict.infer(false)[0];
+  require_test(strict.cache_canonical, "strict delta cache must be canonical");
+  const size_t before = strict.counters.full;
+  strict.mode = neural::Model::FULL;
+  near(strict.infer(false)[0], strict_value, "strict FULL after mode switch");
+  require_test(strict.counters.full == before,
+               "canonical strict cache should not need a redundant full pass");
+
+  auto experimental = cancellation(false, neural::Model::DELTA);
+  experimental.strict_numeric = false;
+  experimental.observe(x);
+  experimental.infer(false);
+  experimental.change_input(0, .01);
+  experimental.infer(false);
+  require_test(!experimental.cache_canonical,
+               "experimental algebraic delta must be marked noncanonical");
+  const size_t before_experimental=experimental.counters.full;
+  experimental.mode=neural::Model::FULL;
+  experimental.infer(false);
+  require_test(experimental.counters.full == before_experimental+1,
+               "FULL must recompute after experimental noncanonical delta");
 }
 static void check_mixed_weight_then_input() {
   neural::Model m("Mixed", 1);
@@ -98,6 +112,35 @@ static void check_mixed_input_then_weight() {
   m.change("out",0,0,-1.);
   near(m.infer(false)[0],600000000.,"mixed final");
   near(m.layers[0].w[0],1.,"mixed final weight");
+}
+static void check_subtle_fp64_cancellation() {
+  auto build=[](neural::Model::Mode mode,bool strict){
+    neural::Model m("RoundingAmplified",3);
+    m.layer("hidden",1,0,19);
+    m.layer("out",1,0,20);
+    for(auto& layer:m.layers){
+      std::fill(layer.w.begin(),layer.w.end(),0.);
+      std::fill(layer.b.begin(),layer.b.end(),0.);
+    }
+    for(int c=0;c<3;c++)m.layers[0].w[c]=1.;
+    m.layers[1].w[0]=100000000.;
+    m.mode=mode;m.strict_numeric=strict;
+    m.observe({-900000000.,0.00000005,900000000.});
+    m.infer(false);
+    m.change_input(1,0.1);
+    return m;
+  };
+  auto reference=build(neural::Model::FULL,true);
+  const double correct=reference.infer(false)[0];
+  auto strict=build(neural::Model::DELTA,true);
+  const double got=strict.infer(false)[0];
+  require_test(got==correct,"canonical partial mismatch at moderate cancellation");
+  require_test(strict.counters.input_delta==1,
+               "strict incremental path was not actually exercised");
+  auto unsafe=build(neural::Model::DELTA,false);
+  const double wrong=unsafe.infer(false)[0];
+  require_test(std::abs(wrong-correct)>1.0,
+               "regression no longer distinguishes historical unsafe algorithm");
 }
 static void check_sgd_transaction() {
   neural::Model m("TransactionalSGD",2);
@@ -166,9 +209,10 @@ int main() {
   run("switch_full_canonicalizes_cache", check_mode_switch_recomputes);
   run("mixed_weight_then_input", check_mixed_weight_then_input);
   run("mixed_input_then_weight", check_mixed_input_then_weight);
+  run("subtle_fp64_cancellation", check_subtle_fp64_cancellation);
   run("sgd_transaction_rollback", check_sgd_transaction);
   run("dag_sgd_transaction_rollback", check_dag_sgd_transaction);
   std::cout << "SEMANTIC_SAFETY " << (failures?"FAIL":"PASS") <<
-               " cases=9 failed=" << failures << "\n";
+               " cases=10 failed=" << failures << "\n";
   return failures ? 1 : 0;
 }

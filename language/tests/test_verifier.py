@@ -97,6 +97,8 @@ int main(){
 int main() {
  neural::Model m("corrupted",3);
  m.layer("h",6,1,31,1);m.layer("out",2,2,19,1);
+ // The injected mutation affects only experimental raw-algebraic deltas.
+ m.strict_numeric=false;
  m.observe({0.4,0.2,0.9});
  try {m.verify(250);}
  catch(const std::exception& e){std::cerr<<e.what()<<"\n";return 10;}

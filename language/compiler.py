@@ -802,7 +802,7 @@ def main(argv=None):
                 link=['-DNEURAL_RUNTIME_SCIPY_BLAS',str(so),f'-Wl,-rpath,{so.parent}']
             else:
                 link=['-DNEURAL_RUNTIME_CBLAS','-lblas']
-        subprocess.run([cxx,'-std=c++17','-O2','-Wall','-Wextra','-Werror','-I',str(runtime),str(cpp),*link,'-o',str(out)],check=True)
+        subprocess.run([cxx,'-std=c++17','-O2','-ffp-contract=off','-Wall','-Wextra','-Werror','-I',str(runtime),str(cpp),*link,'-o',str(out)],check=True)
         print('BUILT:',out)
         if args.run:
             r=subprocess.run([str(out)],cwd=out.parent)

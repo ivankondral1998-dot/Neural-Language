@@ -84,6 +84,9 @@ class Model {
 public:
   std::string name; int ninput;std::vector<Layer> layers; std::vector<double> input;
   std::vector<std::vector<double>> z,a; bool has_input=false,cache=false,cache_canonical=false;
+  // Strict canonical FP64 contract is the default for language programs.
+  // Set to false ONLY in isolated research to exercise unverified algebraic deltas.
+  bool strict_numeric=true;
   uint64_t version=0,cache_version=0;Counters counters;
   std::map<std::string,Snapshot> saved;
   struct Pending {int row, col;double difference;};
@@ -301,6 +304,87 @@ public:
     const double full=double(full_cost())*(has_blas?0.35:0.85)+256.0*layers.size();
     return predicted_delta_cost(pending_layer) < full*0.85;
   }
+  // Canonical change-aware recomputation. Unlike z += W*delta, every affected
+  // row is evaluated from the current input and weights in EXACTLY the same
+  // addition order as forward(). Unaffected rows have identical dependencies.
+  // This makes each committed inference equivalent to FULL for finite inputs
+  // under non-reassociating IEEE FP64. Signed-zero representation is not part
+  // of the numeric-value contract. If BLAS could use another reduction order,
+  // use forward() rather than silently mixing the two implementations.
+  void strict_sparse_update() {
+    if(!cache || !cache_canonical || (pending.empty() && pending_input.empty())
+       || (!pending.empty() && !pending_input.empty())) {forward();return;}
+    // The legacy DAG weight-edit contract is full recomputation; do not
+    // silently extend graph weight optimization in a safety patch.
+    if(graph && !pending.empty()){
+      if(mode==AUTO)counters.auto_full++;
+      forward();return;
+    }
+    for(const auto& l:layers)
+      if(has_blas && l.storage==0 && l.disabled==0 && l.w.size()>=256) {
+        if(mode==AUTO){counters.auto_full++;if(!pending_input.empty())counters.input_auto_full++;}
+        forward();return;
+      }
+
+    const bool input_edit=!pending_input.empty();
+    std::vector<std::vector<int>> changed(layers.size());
+    std::vector<int> root;
+    root.reserve(pending_input.size());
+    for(const auto& e:pending_input)
+      if(input[static_cast<size_t>(e.col)]!=e.original)root.push_back(e.col);
+    if(input_edit && root.empty()){
+      // All edits canceled before the observable inference. No computation.
+      pending_input.clear();cache_version=version;return;
+    }
+    // A failed partial update must force a fresh forward on the next infer.
+    cache=false;
+    for(size_t k=0;k<layers.size();k++){
+      const Layer& l=layers[k];
+      std::vector<double> gathered;
+      const auto& prev=graph?layer_input(k,gathered):(k?a[k-1]:input);
+      std::vector<int> source_changes;
+      size_t offset=0;
+      for(const int parent:l.sources){
+        const auto& src=parent<0?root:changed[static_cast<size_t>(parent)];
+        for(const int col:src)source_changes.push_back(static_cast<int>(offset)+col);
+        offset+=parent<0?static_cast<size_t>(ninput):
+                           static_cast<size_t>(layers[static_cast<size_t>(parent)].out);
+      }
+      require(offset==static_cast<size_t>(l.in),"strict sparse input shape mismatch");
+      for(int r=0;r<l.out;r++){
+        bool affected=false;
+        if(!input_edit && static_cast<int>(k)==pending_layer)
+          for(const auto& edit:pending)
+            if(edit.row==r){affected=true;break;}
+        const size_t base=static_cast<size_t>(r)*l.in;
+        if(!affected)
+          for(const int col:source_changes)
+            if(l.effective(base+static_cast<size_t>(col))!=0.0) {
+              affected=true;break;
+            }
+        if(!affected)continue;
+        const double old=a[k][static_cast<size_t>(r)];
+        double total=l.b[static_cast<size_t>(r)];
+        if(l.storage==0 && l.disabled==0){
+          const double* const row=l.w.data()+base;
+          const double* const x=prev.data();
+          for(int c=0;c<l.in;c++)total+=row[c]*x[c];
+        }else{
+          for(int c=0;c<l.in;c++)total+=l.effective(base+static_cast<size_t>(c))*prev[static_cast<size_t>(c)];
+        }
+        finite(total,"strict sparse activation");
+        z[k][static_cast<size_t>(r)]=total;
+        const double activation=act(total,l.type);
+        a[k][static_cast<size_t>(r)]=activation;
+        if(activation!=old)changed[k].push_back(r);
+      }
+    }
+    cache=true;cache_canonical=true;cache_version=version;
+    pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;
+    counters.delta++;
+    if(input_edit){counters.input_delta++;if(mode==AUTO)counters.auto_delta++;}
+    else if(mode==AUTO)counters.auto_delta++;
+  }
   void flush_pending() {
     if(pending.empty())return;
     if(!choose_delta()){if(mode==AUTO)counters.auto_full++;forward();return;}
@@ -447,8 +531,12 @@ public:
   const std::vector<double>& infer(bool announce=true){
     if(!cache)forward();
     else if(mode==FULL && (!cache_canonical || !pending.empty() || !pending_input.empty()))forward();
-    else if(!pending.empty())flush_pending();
-    else if(!pending_input.empty())flush_input_pending();
+    else if(!pending.empty()){
+      if(strict_numeric)strict_sparse_update();else flush_pending();
+    }
+    else if(!pending_input.empty()){
+      if(strict_numeric)strict_sparse_update();else flush_input_pending();
+    }
     else if(cache_version!=version)forward();
     require(!layers.empty(),"empty network");
     if(announce){std::cout<<"PREDICT version="<<version<<" values=";for(size_t i=0;i<a.back().size();i++)std::cout<<(i?",":"")<<std::setprecision(10)<<a.back()[i];std::cout<<"\n";}return a.back();
@@ -783,7 +871,7 @@ public:
     t.has_input=has_input;t.cache=cache;t.cache_canonical=cache_canonical;
     t.version=version;t.cache_version=cache_version;
     t.pending=pending;t.pending_input=pending_input;t.pending_layer=pending_layer;t.delta_streak=delta_streak;
-    t.mode=mode;t.graph=graph;
+    t.mode=mode;t.graph=graph;t.strict_numeric=strict_numeric;
     return t;
   }
   // Differential self-check invoked by `.nir` VERIFY. Work happens only on
