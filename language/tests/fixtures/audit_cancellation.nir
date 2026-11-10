@@ -1,0 +1,15 @@
+# Audit: FP64 cancellation after an input delta, then FULL mode switch.
+brain Cancellation {
+  senses 2
+  neurons hidden 1 relu
+  neurons out 1 linear
+}
+load_model "cancellation.nlw"
+tune incremental
+observe [-900000000,0.00000005]
+predict
+observe_delta 0 add 900000000
+predict
+tune full
+predict
+expect [5] tolerance 0.000000001
