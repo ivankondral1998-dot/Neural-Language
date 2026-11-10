@@ -74,7 +74,7 @@ struct Snapshot {std::vector<Layer> layers;uint64_t version;std::vector<double> 
 class Model {
 public:
   std::string name; int ninput;std::vector<Layer> layers; std::vector<double> input;
-  std::vector<std::vector<double>> z,a; bool has_input=false,cache=false;
+  std::vector<std::vector<double>> z,a; bool has_input=false,cache=false,cache_approximate=false;
   uint64_t version=0,cache_version=0;Counters counters;
   std::map<std::string,Snapshot> saved;
   struct Pending {int row, col;double difference;};
@@ -216,9 +216,14 @@ public:
     require(has_input,"observe before observe_delta");
     require(col>=0 && col<ninput,"observe_delta input index invalid");
     finite(requested,"observe_delta amount");
-    if(!pending.empty()) infer(false); // commit previous weight edits before input changes
     const double old=input[static_cast<size_t>(col)];
     const double updated=old+requested;finite(updated,"observe_delta new input");
+    if(!pending.empty()){
+      // Commit mixed input/weight changes at the next observable infer/learn,
+      // not at an intermediate combination that can have a different error.
+      cache=false;cache_approximate=false;pending.clear();pending_layer=-1;
+      pending_input.clear();delta_streak=0;
+    }
     const double actual=updated-old;
     input[static_cast<size_t>(col)]=updated;
     version++;counters.input_events++;
@@ -228,7 +233,20 @@ public:
   }
   // All full passes use the same FP64 weights, activation semantics and mask.
   // A BLAS matrix-vector multiply is used only when every edge is enabled.
+  // Conservative cancellation guard; a FULL recompute reconstructs low bits
+  // lost when a large old preactivation was rounded before a later edit.
+  // It does not prove a universal relative-error bound for all FP64 programs.
+  static bool unsafe_cached_delta(double prior,double delta) {
+    const double candidate=prior+delta;
+    if(!std::isfinite(candidate) || std::abs(candidate)>=1.0e9)return true;
+    if(prior==0.0 || delta==0.0)return false;
+    const double scale=std::abs(prior)+std::abs(delta);
+    return std::abs(candidate)<=
+           32.0*std::numeric_limits<double>::epsilon()*scale;
+  }
   void forward() {
+    // A failed calculation must never leave a partially valid activation cache.
+    cache=false;cache_approximate=false;
     require(has_input,"observe an input before inference");
     for(size_t k=0;k<layers.size();k++) {
       const auto& l=layers[k];std::vector<double> combined;
@@ -261,7 +279,7 @@ public:
         }
       }
     }
-    cache=true;cache_version=version;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;counters.full++;
+    cache=true;cache_approximate=false;cache_version=version;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;counters.full++;
   }
   size_t weight_count()const {size_t n=0;for(auto& l:layers)n+=l.weight_count();return n;}
   size_t full_cost()const {return weight_count();}
@@ -289,6 +307,7 @@ public:
   void flush_pending() {
     if(pending.empty())return;
     if(!choose_delta()){if(mode==AUTO)counters.auto_full++;forward();return;}
+    cache=false;cache_approximate=false;
     int l=pending_layer;
     auto& L=layers[l];
     auto const& src=l==0?input:a[l-1];
@@ -297,7 +316,9 @@ public:
     for(const auto& p:pending)change[p.row]+=p.difference*src[p.col];
     for(int r=0;r<L.out;r++){
       if(change[r]==0)continue;
-      double old=a[l][r];z[l][r]+=change[r];finite(z[l][r],"batch delta activation");
+      double old=a[l][r];
+       if(unsafe_cached_delta(z[l][r],change[r])){forward();return;}
+       z[l][r]+=change[r];finite(z[l][r],"batch delta activation");
       a[l][r]=act(z[l][r],L.type);change[r]=a[l][r]-old;
       if(change[r]!=0)active.push_back(r);
     }
@@ -308,13 +329,15 @@ public:
       for(int r=0;r<next.out;r++){
         double dz=0;size_t base=static_cast<size_t>(r)*next.in;
         for(int c:active)dz+=next.effective(base+static_cast<size_t>(c))*change[c];
-        double old=a[k][r];z[k][r]+=dz;finite(z[k][r],"batch propagated activation");
+        double old=a[k][r];
+         if(unsafe_cached_delta(z[k][r],dz)){forward();return;}
+         z[k][r]+=dz;finite(z[k][r],"batch propagated activation");
         a[k][r]=act(z[k][r],next.type);newchanges[r]=a[k][r]-old;
         if(newchanges[r]!=0)next_active.push_back(r);
       }
       change=std::move(newchanges);active=std::move(next_active);
     }
-    cache=true;cache_version=version;pending.clear();pending_layer=-1;
+    cache=true;cache_approximate=true;cache_version=version;pending.clear();pending_layer=-1;
     delta_streak++;counters.delta++;if(mode==AUTO)counters.auto_delta++;
   }
   // Graph-specific change propagation: only changed edges are visited.
@@ -338,6 +361,7 @@ public:
     const bool partial=mode!=FULL && delta_streak<128 &&
        (mode==DELTA || (full_cost()>=65536 && pessimistic<full*0.60));
     if(!partial){if(mode==AUTO){counters.auto_full++;counters.input_auto_full++;}forward();return;}
+    cache=false;cache_approximate=false;
     std::vector<std::vector<std::pair<int,double>>> changed(layers.size());
     for(size_t k=0;k<layers.size();++k){
       const Layer& l=layers[k];
@@ -355,13 +379,14 @@ public:
         require(offset==static_cast<size_t>(l.in),"graph offset mismatch");
         if(dz==0.0)continue;
         const double old=a[k][static_cast<size_t>(r)];
+        if(unsafe_cached_delta(z[k][static_cast<size_t>(r)],dz)){forward();return;}
         z[k][static_cast<size_t>(r)]+=dz;finite(z[k][static_cast<size_t>(r)],"graph propagated preactivation");
         a[k][static_cast<size_t>(r)]=act(z[k][static_cast<size_t>(r)],l.type);
         const double delta=a[k][static_cast<size_t>(r)]-old;
         if(delta!=0.0)diff.push_back({r,delta});
       }
     }
-    cache=true;cache_version=version;pending_input.clear();
+    cache=true;cache_approximate=true;cache_version=version;pending_input.clear();
     delta_streak++;counters.delta++;counters.input_delta++;
     if(mode==AUTO)counters.auto_delta++;
   }
@@ -392,6 +417,7 @@ public:
     const bool choose=(mode==DELTA || (mode==AUTO && full_cost()>=1024 && estimate<full*0.70))
                  && delta_streak<128;
     if(!choose){if(mode==AUTO){counters.auto_full++;counters.input_auto_full++;}forward();return;}
+    cache=false;cache_approximate=false;
     std::vector<double> change(first.out,0.0);
     for(const auto& p:effective)
       for(int r=0;r<first.out;r++)
@@ -399,7 +425,9 @@ public:
     std::vector<int> active;
     for(int r=0;r<first.out;r++){
       if(change[r]==0.0)continue;
-      const double old=a[0][r];z[0][r]+=change[r];finite(z[0][r],"input delta preactivation");
+      const double old=a[0][r];
+      if(unsafe_cached_delta(z[0][r],change[r])){forward();return;}
+      z[0][r]+=change[r];finite(z[0][r],"input delta preactivation");
       a[0][r]=act(z[0][r],first.type);change[r]=a[0][r]-old;
       if(change[r]!=0.0)active.push_back(r);
     }
@@ -411,18 +439,20 @@ public:
       for(int r=0;r<next.out;r++){
         double dz=0.0;const size_t row=static_cast<size_t>(r)*next.in;
         for(int col:active)dz+=next.effective(row+static_cast<size_t>(col))*change[col];
-        const double old=a[k][r];z[k][r]+=dz;finite(z[k][r],"input delta propagated preactivation");
+        const double old=a[k][r];
+        if(unsafe_cached_delta(z[k][r],dz)){forward();return;}
+        z[k][r]+=dz;finite(z[k][r],"input delta propagated preactivation");
         a[k][r]=act(z[k][r],next.type);next_change[r]=a[k][r]-old;
         if(next_change[r]!=0.0)next_active.push_back(r);
       }
       change=std::move(next_change);active=std::move(next_active);
     }
-    cache=true;cache_version=version;pending_input.clear();
+    cache=true;cache_approximate=true;cache_version=version;pending_input.clear();
     delta_streak++;counters.delta++;counters.input_delta++;
     if(mode==AUTO)counters.auto_delta++;
   }
   const std::vector<double>& infer(bool announce=true){
-    if(!cache)forward();
+    if(!cache || (mode==FULL && cache_approximate))forward();
     else if(!pending.empty())flush_pending();
     else if(!pending_input.empty())flush_input_pending();
     else if(cache_version!=version)forward();
@@ -434,9 +464,13 @@ public:
   // Weight changes are staged; flush only when a prediction/learning step needs
   // activations. Different-layer batches fall back to a safe full recompute.
   void mutate(int l,int row,int col,double new_weight,int new_gate) {
-    if(!pending_input.empty())infer(false); // different effect epoch; never mix stale inputs/weights
     size_t ix=index(l,row,col);Layer& L=layers[l];finite(new_weight,"weight");
     require(new_gate==0||new_gate==1,"gate invalid");
+    if(!pending_input.empty()){
+      // No eager evaluation at this internal edit boundary.
+      cache=false;cache_approximate=false;pending_input.clear();pending.clear();
+      pending_layer=-1;delta_streak=0;
+    }
     const double old=L.effective(ix);const int old_gate=L.enabled[ix];
     // If the edit crosses layers, a single-layer batch cannot capture all
     // dependencies; invalidate and recover with a mathematically full pass.
@@ -469,7 +503,21 @@ public:
     // equivalent incremental paths can differ by FP64 rounding, and those
     // differences otherwise alter subsequent SGD weight updates. Inference
     // may reuse cached work; learning re-evaluates exact current state.
-    forward();
+    // Construct the full SGD update on an isolated model. Any invalid
+    // gradient, weight, allocation or numerical value leaves the original
+    // weights, cache, version and counters untouched.
+    Model candidate=isolated_copy();
+    candidate.forward(); // canonical FULL activations
+    auto& layers=candidate.layers;
+    const auto& a=candidate.a;
+    const auto& z=candidate.z;
+    const auto& input=candidate.input;
+    auto commit=[&](){
+      this->layers.swap(candidate.layers); // std::vector swap is noexcept
+      version++;cache=false;cache_approximate=false;
+      pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;
+      counters.full++;counters.train++;
+    };
     if(graph){
       std::vector<std::vector<double>> grad(layers.size()), adj(layers.size());
       for(size_t k=0;k<layers.size();k++)adj[k].assign(layers[k].out,0.0);
@@ -498,7 +546,7 @@ public:
       }
       for(size_t k=0;k<layers.size();k++){
         auto& l=layers[k];std::vector<double> combined;
-        const auto& prev=layer_input(k,combined);
+        const auto& prev=candidate.layer_input(k,combined);
         for(int r=0;r<l.out;r++){
           for(int col=0;col<l.in;col++){
             const size_t ix=static_cast<size_t>(r)*l.in+col;
@@ -511,7 +559,7 @@ public:
           finite(b,"graph updated bias");l.b[static_cast<size_t>(r)]=b;
         }
       }
-      version++;cache=false;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;counters.train++;
+      commit();
       return;
     }
     std::vector<std::vector<double>> grad(layers.size());
@@ -537,7 +585,7 @@ public:
         double b=l.b[r]-rate*grad[k][r];finite(b,"updated bias");l.b[r]=b;
       }
     }
-    version++;cache=false;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;counters.train++;
+    commit();
   }
   void checkpoint(const std::string& label){require(saved.count(label)==0,"checkpoint already exists; use a new name");require(saved.size()<64,"checkpoint limit");saved[label]=Snapshot{layers,version,input,has_input};std::cout<<"CHECKPOINT "<<label<<" version="<<version<<"\n";}
   void restore(const std::string& label){auto it=saved.find(label);require(it!=saved.end(),"unknown checkpoint: "+label);layers=it->second.layers;input=it->second.input;has_input=it->second.has_input;version++;cache=false;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;std::cout<<"RESTORE "<<label<<" version="<<version<<"\n";}
@@ -748,7 +796,7 @@ public:
     t.layers=layers;t.input=input;t.z=z;t.a=a;
     t.has_input=has_input;t.cache=cache;t.version=version;t.cache_version=cache_version;
     t.pending=pending;t.pending_input=pending_input;t.pending_layer=pending_layer;t.delta_streak=delta_streak;
-    t.mode=mode;t.graph=graph;
+    t.mode=mode;t.graph=graph;t.cache_approximate=cache_approximate;
     return t;
   }
   // Differential self-check invoked by `.nir` VERIFY. Work happens only on
