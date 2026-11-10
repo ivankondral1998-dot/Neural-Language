@@ -100,11 +100,23 @@ inline void train_data(Model& model, const std::string& path, int samples, int e
               << " steps=" << static_cast<uint64_t>(samples) * epochs << " seed=" << seed << '\n';
 }
 
+// Existing fast one-pass behavior: validated dataset retained in memory.
 inline void predict_data(Model& model, const std::string& path, int samples) {
-    // Preserve the original all-or-nothing file validation: no predictions
-    // are printed and the model is untouched if a row is malformed.
-    // Inference then streams one row at a time instead of retaining
-    // samples * model.ninput doubles in RAM (important for mobile).
+    const auto rows = read_dataset(path, samples, model.ninput);
+    for (size_t i = 0; i < rows.size(); ++i) {
+        model.observe(rows[i].features);
+        const auto& prediction = model.infer(false);
+        std::cout << "DATA_PREDICT index=" << i << " values=";
+        for (size_t j = 0; j < prediction.size(); ++j)
+            std::cout << (j ? "," : "") << std::setprecision(17) << prediction[j];
+        std::cout << '\n';
+    }
+}
+
+// Opt-in memory profile: pre-validate every row before producing output,
+// then stream input one row at a time. This trades more file parsing for
+// O(input width) row storage instead of O(samples * input width).
+inline void predict_data_streaming(Model& model, const std::string& path, int samples) {
     visit_dataset_rows(path, samples, model.ninput, 0, [](DatasetRow&&) {});
     size_t index = 0;
     visit_dataset_rows(path, samples, model.ninput, 0, [&](DatasetRow&& row) {
