@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-10",
+  "base_commit": "5cf5e5b9c96455903c8d898796389a965fd1cf66",
+  "model_parameters": 55439360,
+  "corpus_rows": 4,
+  "steps": 4,
+  "train_first_loss": 5.639770030975342,
+  "train_last_loss": 3.9070489406585693,
+  "first_row_post_loss": 3.2774851322174072,
+  "train_loop_seconds": 10.028,
+  "full_process_seconds": 18.26,
+  "peak_rss_kib": 1457244,
+  "checkpoint_bytes": 221799185,
+  "checkpoint_sha256": "a25b34910ad82a9d4efb30e375d1cd8c846880e58302a81c6285636c4fdc402d",
+  "checkpoint_in_github": false,
+  "actual_useful_conversation": false,
+  "generation": "invalid_utf8_and_nonsensical",
+  "platform": "PyTorch 2.10.0+cpu",
+  "github_actions": false
+}
