@@ -1,0 +1,27 @@
+# Control case: original linear network is sufficient. Should reject gratuitous graph growth.
+brain AffineControl {
+  senses 2
+  neurons output 1 linear
+  init 37
+  budget 8192 128
+}
+cycle 900 {
+  observe [-1, -1]
+  learn [0.049999999999999989] rate 0.04
+  observe [-1, 0]
+  learn [-0.25] rate 0.04
+  observe [-1, 1]
+  learn [-0.55000000000000004] rate 0.04
+  observe [0, -1]
+  learn [0.44999999999999996] rate 0.04
+  observe [0, 0]
+  learn [0.14999999999999999] rate 0.04
+  observe [0, 1]
+  learn [-0.14999999999999999] rate 0.04
+  observe [1, -1]
+  learn [0.85000000000000009] rate 0.04
+  observe [1, 0]
+  learn [0.55000000000000004] rate 0.04
+  observe [1, 1]
+  learn [0.25000000000000006] rate 0.04
+}
