@@ -26,7 +26,7 @@ def primitive_work(op):
     if op["op"] == "train_data":
         return op["samples"] * op["epochs"]
     if op["op"] == "predict_data":
-        return op["samples"]
+        return op["samples"] * (2 if op.get("stream") else 1)
     return 1
 
 class CompileError(Exception):
@@ -183,9 +183,9 @@ def parse(text):
                 out.append({'op':'observe_delta','index':integer(mo.group(1),line,0,senses-1),
                             'delta':num(mo.group(2),line),'line':line});continue
             mo=re.fullmatch(r'(train_data|predict_data)\s+(".*")\s+samples\s+(\d+)'
-                            r'(?:\s+epochs\s+(\d+)\s+rate\s+(\S+)\s+seed\s+(\d+))?',s)
+                            r'(?:\s+epochs\s+(\d+)\s+rate\s+(\S+)\s+seed\s+(\d+))?(?:\s+(stream))?',s)
             if mo:
-                kind, source, samples, epochs, rate, shuffle_seed = mo.groups()
+                kind, source, samples, epochs, rate, shuffle_seed, stream = mo.groups()
                 if (kind == 'train_data') != (epochs is not None):
                     fail(line, 'train_data requires epochs, rate and seed; predict_data takes only samples')
                 op={'op':kind,'filename':quoted(source,line),
@@ -193,6 +193,9 @@ def parse(text):
                 if epochs is not None:
                     op.update(epochs=integer(epochs,line,1,1000),rate=num(rate,line),
                               seed=integer(shuffle_seed,line,0,4294967295))
+                if stream is not None:
+                    if kind!='predict_data': fail(line,'stream applies only to predict_data')
+                    op['stream']=True
                 out.append(op)
                 continue
             if s=='predict':out.append({'op':'predict','line':line});continue
@@ -577,6 +580,7 @@ def verify_typed_ir(ir):
                     require(samples*senses <= _MAX_DATA_ELEMENTS,kind+' dataset element limit exceeded')
                     signature={'features':{'dtype':'f64','rank':2,'columns':senses}}
                     if kind=='train_data':
+                        require('stream' not in op,'train_data cannot use stream profile')
                         require(prev>=2,'train_data requires at least two output classes')
                         uint(op.get('epochs'),1,1000,'train_data epochs')
                         uint(op.get('seed'),0,4294967295,'train_data seed')
@@ -588,6 +592,9 @@ def verify_typed_ir(ir):
                         require(not {'epochs','rate','seed'}.intersection(op),
                                 'predict_data cannot carry training operands')
                         signature['logits']={'dtype':'f64','columns':prev}
+                        if 'stream' in op:
+                            require(op['stream'] is True,'predict_data stream must be true')
+                            signature['stream']='verified_two_pass'
                     signatures[kind]=signature
                 elif kind=='expect':
                     vec(op.get('values'),prev,'expect')
@@ -788,7 +795,8 @@ def emit(ir):
             elif o=='train_data':
                 lines.append(f'neural::train_data(brain,{string(x["filename"])},{x["samples"]},{x["epochs"]},{number(x["rate"])},{x["seed"]}u);')
             elif o=='predict_data':
-                lines.append(f'neural::predict_data(brain,{string(x["filename"])},{x["samples"]});')
+                impl='predict_data_streaming' if x.get('stream') else 'predict_data'
+                lines.append(f'neural::{impl}(brain,{string(x["filename"])},{x["samples"]});')
             elif o=='learn':lines.append(f'brain.learn({vec(x["values"])},{number(x["rate"])});')
             elif o=='tune':lines.append('brain.mode=neural::Model::'+{'auto':'AUTO','full':'FULL','incremental':'DELTA'}[x['mode']]+';')
             elif o=='weight':lines.append(f'brain.change({string(x["layer"])},{x["row"]},{x["col"]},{number(x["delta"])});')
@@ -806,7 +814,7 @@ def emit(ir):
             elif o=='report':lines.append(f'brain.report({string(x["filename"])});')
             else:raise AssertionError(o)
     block(ir['operations'])
-    if any(line.startswith(('neural::train_data(', 'neural::predict_data(')) for line in lines):
+    if any(line.startswith(('neural::train_data(', 'neural::predict_data(', 'neural::predict_data_streaming(')) for line in lines):
         lines.insert(1,'#include "neural_dataset.hpp"')
     lines+=['return 0;','} catch(const std::exception& e) {std::cerr<<"NEURAL ERROR: "<<e.what()<<"\\n";return 1;}','}']
     return '\n'.join(lines)+'\n'
