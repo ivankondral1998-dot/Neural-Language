@@ -73,10 +73,10 @@ echo "DEVICE_MODEL=$(getprop ro.product.model 2>/dev/null || echo unknown)"
 sha256sum -c SHA256SUMS
 ./har_generic > generic.log
 ./har_mobile > mobile.log
-awk 'BEGIN{g=0;m=0}
+awk 'BEGIN{g=0;m=0; bad=0}
   FNR==NR && $1=="DATA_PREDICT" {g++; a[g]=$0; next}
-  $1=="DATA_PREDICT" {m++; if ($0 != a[m]) {print "LOGIT_MISMATCH", m; exit 1}}
-  END {if (g!=2947 || m!=2947) {print "ROW_MISMATCH", g, m; exit 1} print "HAR_LOGITS_IDENTICAL", m}' generic.log mobile.log
+  $1=="DATA_PREDICT" {m++; if ($0 != a[m]) {print "LOGIT_MISMATCH", m; bad=1; exit 1}}
+  END {if (bad || g!=2947 || m!=2947) {print "ROW_MISMATCH_OR_BAD_OUTPUT", g, m; exit 1} print "HAR_LOGITS_IDENTICAL", m}' generic.log mobile.log
 ./cartpole_generic > cartpole_generic.log
 ./cartpole_mobile > cartpole_mobile.log
 awk 'BEGIN{g=0;m=0}
@@ -84,9 +84,11 @@ awk 'BEGIN{g=0;m=0}
   $1=="PREDICT" {m++; if ($0 != a[m]) {print "CARTPOLE_MISMATCH"; exit 1}}
   END {if (g!=1 || m!=1) exit 1; print "CARTPOLE_PREDICT_IDENTICAL"}' cartpole_generic.log cartpole_mobile.log
 echo '--- bench har ---'
-./bench_arm64 --task har | tee bench_har.log
+./bench_arm64 --task har > bench_har.log
+cat bench_har.log
 echo '--- bench cartpole ---'
-./bench_arm64 --task cartpole | tee bench_cartpole.log
+./bench_arm64 --task cartpole > bench_cartpole.log
+cat bench_cartpole.log
 echo MOBILE_OPT_002_BENCH_COMPLETE
 """, encoding="utf-8")
     (package / "README.txt").write_text(
