@@ -68,7 +68,7 @@ class AuditSemanticSafety(unittest.TestCase):
                 self.assertIn("PREDICT version=2 values=5", run.stdout)
 
     def test_cpp_runtime_counterexamples(self):
-        """Covers sequence/DAG AUTO+DELTA, mode, both mixed orders and SGD."""
+        """Covers sequence/DAG AUTO+DELTA, mode, mixed orders, and sequential/DAG SGD."""
         for compiler in ("g++", "clang++"):
             if not shutil.which(compiler):
                 self.skipTest(f"{compiler} unavailable")
@@ -85,7 +85,7 @@ class AuditSemanticSafety(unittest.TestCase):
                     [str(exe)], capture_output=True, text=True, timeout=30,
                 )
                 self.assertEqual(run.returncode, 0, run.stderr + run.stdout)
-                self.assertIn("SEMANTIC_SAFETY PASS cases=8 failed=0", run.stdout)
+                self.assertIn("SEMANTIC_SAFETY PASS cases=9 failed=0", run.stdout)
 
 
 if __name__ == "__main__":
