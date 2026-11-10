@@ -138,6 +138,36 @@ class PlanNative(unittest.TestCase):
             self.assertEqual(ir['compute_plan']['profile'], 'mobile-cpu')
             self.assertNotIn('compute_plan', json.loads((generic_dir / 'generic.nir.json').read_text(encoding='utf-8')))
 
+    def test_mobile_dataset_prediction_matches_generic(self):
+        source = """brain PredictRows {
+  senses 3
+  neurons hidden 4 tanh
+  neurons out 2 linear
+  init 7
+}
+tune full
+predict_data "rows.txt" samples 4
+report "rows_report.json"
+"""
+        rows = "0 0 0\\n0.2 -0.1 0.5\\n-0.3 0.4 -0.2\\n0.2 -0.1 0.5\\n"
+        with tempfile.TemporaryDirectory(prefix='nl_reuse_data_') as tmp:
+            outputs = {}
+            for name, profile in (('generic', 'generic'), ('mobile', 'mobile-cpu')):
+                directory = Path(tmp) / name
+                directory.mkdir()
+                (directory / 'rows.txt').write_text(rows, encoding='utf-8')
+                build = compile_nir(source, directory, name, profile)
+                self.assertEqual(build.returncode, 0, build.stderr)
+                run = subprocess.run([str(directory / name)], cwd=directory,
+                                     capture_output=True, text=True, timeout=20)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                outputs[name] = run.stdout
+                if name == 'mobile':
+                    report = json.loads((directory / 'rows_report.json').read_text())
+                    self.assertEqual(report['counts']['mobile_plan'], 4)
+            self.assertEqual(outputs['generic'], outputs['mobile'])
+            self.assertEqual(outputs['mobile'].count('DATA_PREDICT index='), 4)
+
     def test_training_weights_match_generic(self):
         rows = ['0 0.2 0.1', '1 -0.3 0.4', '0 0.5 -0.2', '1 0.1 0.3']
         with tempfile.TemporaryDirectory(prefix='nl_mobile_train_') as temp:
