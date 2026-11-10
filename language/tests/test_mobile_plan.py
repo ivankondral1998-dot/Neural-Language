@@ -1,5 +1,6 @@
 """mobile-cpu profile: IR plan, fallback, and FP64 agreement with generic FULL."""
 import json
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -66,6 +67,23 @@ class PlanIr(unittest.TestCase):
         self.assertIn('neural::mobile_dense_ilp4<4,2,0>', cpp)
         self.assertIn('brain.mobile_forward=&nl_mobile_try;', cpp)
 
+    def test_mobile_dataset_uses_full_buffer_reuse(self):
+        source = """brain Rows {
+  senses 2
+  neurons out 2 linear
+}
+load_model "weights.nlw"
+tune full
+predict_data "rows.txt" samples 2
+"""
+        generic = emit(parse(source))
+        self.assertIn('neural::predict_data(brain,"rows.txt",2);', generic)
+        self.assertNotIn('neural::predict_data(brain,"rows.txt",2,true);', generic)
+        ir = parse(source)
+        ir['compute_plan'] = make_mobile_plan(ir)
+        mobile = emit(ir)
+        self.assertIn('neural::predict_data(brain,"rows.txt",2,true);', mobile)
+
     def test_int8_and_graph_rejected(self):
         int8 = 'brain Q {\n senses 2\n neurons h 3 relu int8\n neurons o 1 linear\n}\nobserve [0, 0]\npredict\n'
         graph = 'brain G {\n senses 2\n neurons a 2 relu from input\n neurons b 1 linear from input a\n}\nobserve [0, 1]\npredict\n'
@@ -76,6 +94,26 @@ class PlanIr(unittest.TestCase):
 
 
 class PlanNative(unittest.TestCase):
+    def test_input_reuse_matches_full_without_reallocation(self):
+        # This program tests the actual native runtime, independently of .nir
+        # codegen, including bad-data rollback and stable input allocation.
+        probe = ROOT / 'tests/runtime_mobile_input_reuse.cpp'
+        for cxx in ('g++', 'clang++'):
+            if not shutil.which(cxx):
+                continue
+            with self.subTest(cxx=cxx), tempfile.TemporaryDirectory() as tmp:
+                exe = Path(tmp) / 'input_reuse'
+                build = subprocess.run(
+                    [cxx, '-std=c++17', '-O2', '-ffp-contract=off', '-Wall',
+                     '-Wextra', '-Werror', '-I', str(ROOT / 'runtime'),
+                     str(probe), '-o', str(exe)],
+                    capture_output=True, text=True, timeout=60)
+                self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+                run = subprocess.run([str(exe)], capture_output=True,
+                                     text=True, timeout=20)
+                self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+                self.assertIn('MOBILE_INPUT_REUSE_PASS', run.stdout)
+
     def test_predict_matches_generic_and_plan_runs(self):
         with tempfile.TemporaryDirectory(prefix='nl_mobile_') as temp:
             root = Path(temp)
