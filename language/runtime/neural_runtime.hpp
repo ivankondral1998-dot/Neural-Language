@@ -74,7 +74,7 @@ struct Snapshot {std::vector<Layer> layers;uint64_t version;std::vector<double> 
 class Model {
 public:
   std::string name; int ninput;std::vector<Layer> layers; std::vector<double> input;
-  std::vector<std::vector<double>> z,a; bool has_input=false,cache=false;
+  std::vector<std::vector<double>> z,a; bool has_input=false,cache=false,cache_canonical=false;
   uint64_t version=0,cache_version=0;Counters counters;
   std::map<std::string,Snapshot> saved;
   struct Pending {int row, col;double difference;};
@@ -216,10 +216,14 @@ public:
     require(has_input,"observe before observe_delta");
     require(col>=0 && col<ninput,"observe_delta input index invalid");
     finite(requested,"observe_delta amount");
-    if(!pending.empty()) infer(false); // commit previous weight edits before input changes
     const double old=input[static_cast<size_t>(col)];
     const double updated=old+requested;finite(updated,"observe_delta new input");
     const double actual=updated-old;
+    // Combined weight/input edits are observed together on the NEXT predict.
+    // Do not evaluate an intermediate state that FULL would never expose.
+    if(!pending.empty()){
+      cache=false;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;
+    }
     input[static_cast<size_t>(col)]=updated;
     version++;counters.input_events++;
     if(actual==0){if(cache && pending_input.empty())cache_version=version;return;}
@@ -230,6 +234,8 @@ public:
   // A BLAS matrix-vector multiply is used only when every edge is enabled.
   void forward() {
     require(has_input,"observe an input before inference");
+    // A failed computation must not leave a valid cache with partially written activations.
+    cache=false;cache_canonical=false;
     for(size_t k=0;k<layers.size();k++) {
       const auto& l=layers[k];std::vector<double> combined;
       const auto& prev=graph?layer_input(k,combined):(k?a[k-1]:input);
@@ -261,7 +267,7 @@ public:
         }
       }
     }
-    cache=true;cache_version=version;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;counters.full++;
+    cache=true;cache_canonical=true;cache_version=version;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;counters.full++;
   }
   size_t weight_count()const {size_t n=0;for(auto& l:layers)n+=l.weight_count();return n;}
   size_t full_cost()const {return weight_count();}
@@ -423,6 +429,7 @@ public:
   }
   const std::vector<double>& infer(bool announce=true){
     if(!cache)forward();
+    else if(mode==FULL && (!cache_canonical || !pending.empty() || !pending_input.empty()))forward();
     else if(!pending.empty())flush_pending();
     else if(!pending_input.empty())flush_input_pending();
     else if(cache_version!=version)forward();
@@ -434,9 +441,13 @@ public:
   // Weight changes are staged; flush only when a prediction/learning step needs
   // activations. Different-layer batches fall back to a safe full recompute.
   void mutate(int l,int row,int col,double new_weight,int new_gate) {
-    if(!pending_input.empty())infer(false); // different effect epoch; never mix stale inputs/weights
     size_t ix=index(l,row,col);Layer& L=layers[l];finite(new_weight,"weight");
     require(new_gate==0||new_gate==1,"gate invalid");
+    // The next observable infer() sees the combined input/weight edit.
+    // Re-evaluating an intermediate epoch here can throw although final FULL is valid.
+    if(!pending_input.empty()){
+      cache=false;pending_input.clear();pending.clear();pending_layer=-1;delta_streak=0;
+    }
     const double old=L.effective(ix);const int old_gate=L.enabled[ix];
     // If the edit crosses layers, a single-layer batch cannot capture all
     // dependencies; invalidate and recover with a mathematically full pass.
@@ -496,8 +507,10 @@ public:
         }
         require(offset==l.in,"DAG learning layer shape mismatch");
       }
+      // Stage ALL updates before touching live weights. Failure is a rollback.
+      auto staged_layers=layers;
       for(size_t k=0;k<layers.size();k++){
-        auto& l=layers[k];std::vector<double> combined;
+        auto& l=staged_layers[k];std::vector<double> combined;
         const auto& prev=layer_input(k,combined);
         for(int r=0;r<l.out;r++){
           for(int col=0;col<l.in;col++){
@@ -511,6 +524,7 @@ public:
           finite(b,"graph updated bias");l.b[static_cast<size_t>(r)]=b;
         }
       }
+      layers.swap(staged_layers); // no-throw commit after successful validation
       version++;cache=false;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;counters.train++;
       return;
     }
@@ -526,9 +540,11 @@ public:
         grad[k][j]=v*derivative(z[k][j],a[k][j],layers[k].type);
       }
     }
-    // All gradients calculated using old weights; update after backpropagation.
+    // All gradients calculated using old weights. Transactional SGD: validate
+    // every proposed weight/bias in private storage before publishing any of them.
+    auto staged_layers=layers;
     for(size_t k=0;k<layers.size();k++){
-      Layer& l=layers[k];const auto& prev=k?a[k-1]:input;
+      Layer& l=staged_layers[k];const auto& prev=k?a[k-1]:input;
       for(int r=0;r<l.out;r++){
         for(int c=0;c<l.in;c++){
           size_t ix=static_cast<size_t>(r)*l.in+c;
@@ -537,6 +553,7 @@ public:
         double b=l.b[r]-rate*grad[k][r];finite(b,"updated bias");l.b[r]=b;
       }
     }
+    layers.swap(staged_layers); // no-throw commit
     version++;cache=false;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;counters.train++;
   }
   void checkpoint(const std::string& label){require(saved.count(label)==0,"checkpoint already exists; use a new name");require(saved.size()<64,"checkpoint limit");saved[label]=Snapshot{layers,version,input,has_input};std::cout<<"CHECKPOINT "<<label<<" version="<<version<<"\n";}
@@ -746,7 +763,8 @@ public:
   Model isolated_copy()const {
     Model t(name,ninput);
     t.layers=layers;t.input=input;t.z=z;t.a=a;
-    t.has_input=has_input;t.cache=cache;t.version=version;t.cache_version=cache_version;
+    t.has_input=has_input;t.cache=cache;t.cache_canonical=cache_canonical;
+    t.version=version;t.cache_version=cache_version;
     t.pending=pending;t.pending_input=pending_input;t.pending_layer=pending_layer;t.delta_streak=delta_streak;
     t.mode=mode;t.graph=graph;
     return t;
