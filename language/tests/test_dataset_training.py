@@ -68,9 +68,10 @@ class DatasetTrainingTests(unittest.TestCase):
 
     def test_native_vector_targets_learn_reload_and_bad_rows(self):
         regress = 'train_data "targets.txt" samples 4 epochs 80 rate 0.1 seed 17 targets vector\n'
-        infer = 'predict_data "features.txt" samples 4\n'
+        infer = 'predict_data "features.txt" samples 2\n'
         targets = "0 0 0 0\n0 1 0 1\n1 0 1 0\n1 1 1 1\n"
-        features = "0 0\n0 1\n1 0\n1 1\n"
+        # Withheld interior points; not present in the SGD training rows.
+        features = "0.25 0.75\n0.8 0.2\n"
         for cxx in ("g++", "clang++"):
             if not shutil.which(cxx):
                 self.skipTest(f"{cxx} unavailable")
@@ -90,8 +91,8 @@ class DatasetTrainingTests(unittest.TestCase):
                     self.assertEqual(prediction.returncode, 0, prediction.stdout + prediction.stderr)
                     vals = [list(map(float, line.split("values=")[1].split(",")))
                             for line in prediction.stdout.splitlines() if "DATA_PREDICT index=" in line]
-                    self.assertEqual(len(vals), 4)
-                    for row, actual in zip(((0, 0), (0, 1), (1, 0), (1, 1)), vals):
+                    self.assertEqual(len(vals), 2)
+                    for row, actual in zip(((0.25, 0.75), (0.8, 0.2)), vals):
                         self.assertLess(max(abs(got - goal) for got, goal in zip(actual, row)), 0.08)
                 self.assertEqual((root / "first/weights.nlw").read_bytes(),
                                  (root / "repeat/weights.nlw").read_bytes())
