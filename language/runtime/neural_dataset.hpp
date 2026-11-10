@@ -13,8 +13,11 @@ struct DatasetRow {
 
 // The shape is supplied by checked IR, not inferred from the file. Reading
 // the complete dataset first keeps malformed input from triggering SGD.
-inline std::vector<DatasetRow> read_dataset(const std::string& path, int samples,
-                                            int width, int classes = 0) {
+// Streaming row parser shared by training, validation and inference.
+// The caller controls whether rows are retained in memory.
+template<class RowSink>
+inline void visit_dataset_rows(const std::string& path, int samples, int width,
+                               int classes, RowSink&& consume) {
     Model::safe_model_filename(path);
     require(width > 0 && width <= 2048 && samples > 0 && samples <= 100000 &&
             static_cast<uint64_t>(samples) * width <= 8000000, "dataset shape exceeds limits");
@@ -25,8 +28,6 @@ inline std::vector<DatasetRow> read_dataset(const std::string& path, int samples
     require(!ec && bytes <= 128ull * 1024 * 1024, "dataset file exceeds byte limit");
     std::ifstream stream(path);
     require(bool(stream), "cannot open dataset");
-    std::vector<DatasetRow> rows;
-    rows.reserve(static_cast<size_t>(samples));
     std::string line;
     for (int row = 0; row < samples; ++row) {
         const auto location = "dataset row " + std::to_string(row + 1);
@@ -53,10 +54,19 @@ inline std::vector<DatasetRow> read_dataset(const std::string& path, int samples
         }
         values >> std::ws;
         require(values.eof(), location + ": extra field");
-        rows.push_back(std::move(sample));
+        consume(std::move(sample));
     }
     require(stream.peek() == std::char_traits<char>::eof() && !stream.bad(),
             "dataset contains extra rows or a read failed");
+}
+
+inline std::vector<DatasetRow> read_dataset(const std::string& path, int samples,
+                                            int width, int classes = 0) {
+    std::vector<DatasetRow> rows;
+    rows.reserve(static_cast<size_t>(samples));
+    visit_dataset_rows(path, samples, width, classes, [&](DatasetRow&& row) {
+        rows.push_back(std::move(row));
+    });
     return rows;
 }
 
@@ -91,15 +101,20 @@ inline void train_data(Model& model, const std::string& path, int samples, int e
 }
 
 inline void predict_data(Model& model, const std::string& path, int samples) {
-    const auto rows = read_dataset(path, samples, model.ninput);
-    for (size_t i = 0; i < rows.size(); ++i) {
-        model.observe(rows[i].features);
+    // Preserve the original all-or-nothing file validation: no predictions
+    // are printed and the model is untouched if a row is malformed.
+    // Inference then streams one row at a time instead of retaining
+    // samples * model.ninput doubles in RAM (important for mobile).
+    visit_dataset_rows(path, samples, model.ninput, 0, [](DatasetRow&&) {});
+    size_t index = 0;
+    visit_dataset_rows(path, samples, model.ninput, 0, [&](DatasetRow&& row) {
+        model.observe(std::move(row.features));
         const auto& prediction = model.infer(false);
-        std::cout << "DATA_PREDICT index=" << i << " values=";
+        std::cout << "DATA_PREDICT index=" << index++ << " values=";
         for (size_t j = 0; j < prediction.size(); ++j)
             std::cout << (j ? "," : "") << std::setprecision(17) << prediction[j];
         std::cout << '\n';
-    }
+    });
 }
 
 } // namespace neural
