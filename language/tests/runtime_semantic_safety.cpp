@@ -150,6 +150,25 @@ static void check_dag_sgd_transaction() {
   m.forward();
   near(m.infer(false)[0],0.,"DAG canonical forward after failed SGD");
 }
+static void check_simple_delta_value() {
+  neural::Model fast("InputDelta", 2), full("InputFull", 2);
+  fast.layer("out", 1, 0, 11);
+  full.layer("out", 1, 0, 11);
+  for(auto* model : {&fast, &full}) {
+    model->layers[0].w={1.,0.};
+    model->layers[0].b={0.};
+    model->observe({0.25,0.});
+  }
+  fast.mode=neural::Model::DELTA;
+  full.mode=neural::Model::FULL;
+  near(fast.infer(false)[0],0.25,"delta original");
+  near(full.infer(false)[0],0.25,"full original");
+  fast.change_input(0,0.5);
+  full.change_input(0,0.5);
+  near(full.infer(false)[0],0.75,"full after input delta");
+  near(fast.infer(false)[0],0.75,"delta after input delta");
+  require_test(fast.counters.input_delta>0,"simple delta must exercise incremental path");
+}
 int main() {
   int failures=0;
   auto run = [&](const char* name, const std::function<void()>& test) {
@@ -168,7 +187,8 @@ int main() {
   run("mixed_input_then_weight", check_mixed_input_then_weight);
   run("sgd_transaction_rollback", check_sgd_transaction);
   run("dag_sgd_transaction_rollback", check_dag_sgd_transaction);
+  run("simple_input_delta_matches_full", check_simple_delta_value);
   std::cout << "SEMANTIC_SAFETY " << (failures?"FAIL":"PASS") <<
-               " cases=9 failed=" << failures << "\n";
+               " cases=10 failed=" << failures << "\n";
   return failures ? 1 : 0;
 }
