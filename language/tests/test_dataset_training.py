@@ -85,6 +85,15 @@ class DatasetTrainingTests(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn("dataset", result.stderr)
                     self.assertFalse((bad / "weights.nlw").exists())
+                # Invalid inference data must not leak partial predictions: validation
+                # precedes the streaming inference pass.
+                (bad / "weights.nlw").write_bytes((root / "first/weights.nlw").read_bytes())
+                for features in ("1 0\n", "1 0\n0\n", "1 0\n0 NaN\n",
+                                 "1 0\n0 1 2\n", "1 0\n0 1\n1 0\n"):
+                    (bad / "test.txt").write_text(features)
+                    result = self.run_native(predictor, bad)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertNotIn("DATA_PREDICT index=", result.stdout)
                 (bad / "weights.nlw").write_bytes((root / "first/weights.nlw").read_bytes()[:-12])
                 (bad / "test.txt").write_text("1 0\n0 1\n")
                 result = self.run_native(predictor, bad)
