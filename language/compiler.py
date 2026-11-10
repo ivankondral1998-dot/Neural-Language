@@ -17,6 +17,17 @@ import unicodedata
 IDENT = re.compile(r"[A-Za-z_][A-Za-z_0-9]*\Z")
 NUMBER = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?"
 VEC = re.compile(r"\[([^\]]*)\]")
+_DATA_OPS = frozenset({"train_data", "predict_data"})
+_MAX_DATA_SAMPLES = 100_000
+_MAX_DATA_ELEMENTS = 8_000_000
+
+
+def primitive_work(op):
+    if op["op"] == "train_data":
+        return op["samples"] * op["epochs"]
+    if op["op"] == "predict_data":
+        return op["samples"]
+    return 1
 
 class CompileError(Exception):
     pass
@@ -171,6 +182,19 @@ def parse(text):
             if mo:
                 out.append({'op':'observe_delta','index':integer(mo.group(1),line,0,senses-1),
                             'delta':num(mo.group(2),line),'line':line});continue
+            mo=re.fullmatch(r'(train_data|predict_data)\s+(".*")\s+samples\s+(\d+)'
+                            r'(?:\s+epochs\s+(\d+)\s+rate\s+(\S+)\s+seed\s+(\d+))?',s)
+            if mo:
+                kind, source, samples, epochs, rate, shuffle_seed = mo.groups()
+                if (kind == 'train_data') != (epochs is not None):
+                    fail(line, 'train_data requires epochs, rate and seed; predict_data takes only samples')
+                op={'op':kind,'filename':quoted(source,line),
+                    'samples':integer(samples,line,1,_MAX_DATA_SAMPLES),'line':line}
+                if epochs is not None:
+                    op.update(epochs=integer(epochs,line,1,1000),rate=num(rate,line),
+                              seed=integer(shuffle_seed,line,0,4294967295))
+                out.append(op)
+                continue
             if s=='predict':out.append({'op':'predict','line':line});continue
             mo=re.fullmatch(r"learn\s+(\[[^\]]*\])\s+rate\s+(\S+)",s)
             if mo:
@@ -229,7 +253,7 @@ def parse(text):
     def cost(arr):
         n=0
         for x in arr:
-            n+=x['count']*cost(x['body']) if x['op']=='cycle' else 1
+            n+=x['count']*cost(x['body']) if x['op']=='cycle' else primitive_work(x)
             if n>1000000:raise CompileError("program exceeds one million operations")
         return n
     steps=cost(program)
@@ -280,6 +304,8 @@ _EFFECTS = {
     'observe':       ((), ('current_input', 'cache'), None),
     'observe_delta': (('current_input',), ('current_input', 'cache'), None),
     'predict':       (('current_input', 'model_parameters'), ('cache', 'counters', 'stdout'), None),
+    'train_data':   (('model_parameters',), ('current_input', 'model_parameters', 'cache', 'model_version', 'counters', 'stdout'), 'read'),
+    'predict_data': (('model_parameters', 'runtime_mode'), ('current_input', 'cache', 'counters', 'stdout'), 'read'),
     'learn':         (('current_input', 'model_parameters'), ('model_parameters', 'cache', 'model_version', 'counters'), None),
     'tune':          ((), ('runtime_mode',), None),
     'weight':        (('model_parameters',), ('model_parameters', 'model_version', 'cache'), None),
@@ -323,7 +349,7 @@ def validate_semantics(program):
                 observed=next_epoch(op['body'],observed)
             else:
                 require_input(op,observed)
-                if kind=='observe':observed=True
+                if kind=='observe' or kind in _DATA_OPS:observed=True
                 elif kind=='rewind':observed=snapshots[op['name']]
         return observed
 
@@ -342,7 +368,7 @@ def validate_semantics(program):
             if kind not in _EFFECTS:raise CompileError(f'NeuralEffects: unsupported operation {kind!r}')
             counts[kind]=counts.get(kind,0)+multiplier
             require_input(op,observed)
-            if kind=='observe':observed=True
+            if kind=='observe' or kind in _DATA_OPS:observed=True
             elif kind=='remember':
                 label=op.get('name')
                 if type(label) is not str:raise CompileError('NeuralEffects: checkpoint name invalid')
@@ -533,7 +559,6 @@ def verify_typed_ir(ir):
                 require(type(body) is list,'cycle body must be an array of operations')
                 cost+=check_ops(body,depth+1)*count
             else:
-                cost+=1
                 if kind=='observe':
                     vec(op.get('values'),senses,'observe')
                     signatures[kind]={'values':{'dtype':'f64','shape':[senses]}}
@@ -546,6 +571,24 @@ def verify_typed_ir(ir):
                     real(op.get('rate'),'learn rate',0,1)
                     require(op['rate']>0,'learn rate must be positive')
                     signatures[kind]={'values':{'dtype':'f64','shape':[prev]},'rate':'f64'}
+                elif kind in _DATA_OPS:
+                    filename(op.get('filename'),kind)
+                    samples=uint(op.get('samples'),1,_MAX_DATA_SAMPLES,kind+' samples')
+                    require(samples*senses <= _MAX_DATA_ELEMENTS,kind+' dataset element limit exceeded')
+                    signature={'features':{'dtype':'f64','rank':2,'columns':senses}}
+                    if kind=='train_data':
+                        require(prev>=2,'train_data requires at least two output classes')
+                        uint(op.get('epochs'),1,1000,'train_data epochs')
+                        uint(op.get('seed'),0,4294967295,'train_data seed')
+                        real(op.get('rate'),'train_data rate',0,1)
+                        require(op['rate']>0,'train_data rate must be positive')
+                        signature.update(label={'dtype':'i32','classes':prev},rate='f64',
+                                         epochs='u32',seed='u32')
+                    else:
+                        require(not {'epochs','rate','seed'}.intersection(op),
+                                'predict_data cannot carry training operands')
+                        signature['logits']={'dtype':'f64','columns':prev}
+                    signatures[kind]=signature
                 elif kind=='expect':
                     vec(op.get('values'),prev,'expect')
                     real(op.get('tolerance'),'expect tolerance',0)
@@ -581,6 +624,7 @@ def verify_typed_ir(ir):
                             'checkpoint name invalid')
                 elif kind in ('save_model','load_model','report'):filename(op.get('filename'),kind)
                 # predict and inspect carry no operands
+                cost+=primitive_work(op)
             require(cost <= 1000000,'program exceeds one million operations')
         return cost
     total_ops=check_ops(operations)
@@ -678,14 +722,15 @@ def analyze_ir(ir):
     def scan(ops,scale=1):
         for op in ops:
             if op['op']=='cycle':scan(op['body'],scale*op['count'])
+            elif op['op'] in _DATA_OPS:counts[op['op']]=counts.get(op['op'],0)+scale*primitive_work(op)
             elif op['op'] in counts:counts[op['op']]+=scale
     scan(ir['operations'])
     messages=[]
     if any(layer.get('storage')=='int8' for layer in b['neurons']):
         messages.append('INT8 uses fixed scale 1/127; small training steps can round to zero; validate convergence separately.')
-    if counts['learn'] and not counts['predict']:
+    if (counts['learn'] or counts.get('train_data')) and not (counts['predict'] or counts.get('predict_data')):
         messages.append('Training has no explicit final prediction; add a held-out observation and predict to evaluate it.')
-    if counts['learn']:
+    if counts['learn'] or counts.get('train_data'):
         messages.append('Learning uses local SGD on squared error; no evidence of generalization or resistance to forgetting.')
     if counts['observe_delta']:
         messages.append('Observe_delta is a stateful input patch; AUTO may use delta propagation or a full recompute; no guaranteed mobile win.')
@@ -740,6 +785,10 @@ def emit(ir):
             elif o=='observe':lines.append(f'brain.observe({vec(x["values"])});')
             elif o=='observe_delta':lines.append(f'brain.change_input({x["index"]},{number(x["delta"])});')
             elif o=='predict':lines.append('brain.infer();')
+            elif o=='train_data':
+                lines.append(f'neural::train_data(brain,{string(x["filename"])},{x["samples"]},{x["epochs"]},{number(x["rate"])},{x["seed"]}u);')
+            elif o=='predict_data':
+                lines.append(f'neural::predict_data(brain,{string(x["filename"])},{x["samples"]});')
             elif o=='learn':lines.append(f'brain.learn({vec(x["values"])},{number(x["rate"])});')
             elif o=='tune':lines.append('brain.mode=neural::Model::'+{'auto':'AUTO','full':'FULL','incremental':'DELTA'}[x['mode']]+';')
             elif o=='weight':lines.append(f'brain.change({string(x["layer"])},{x["row"]},{x["col"]},{number(x["delta"])});')
@@ -757,6 +806,8 @@ def emit(ir):
             elif o=='report':lines.append(f'brain.report({string(x["filename"])});')
             else:raise AssertionError(o)
     block(ir['operations'])
+    if any(line.startswith(('neural::train_data(', 'neural::predict_data(')) for line in lines):
+        lines.insert(1,'#include "neural_dataset.hpp"')
     lines+=['return 0;','} catch(const std::exception& e) {std::cerr<<"NEURAL ERROR: "<<e.what()<<"\\n";return 1;}','}']
     return '\n'.join(lines)+'\n'
 

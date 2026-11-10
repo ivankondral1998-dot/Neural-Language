@@ -1,0 +1,9 @@
+# Independently compiled inference. No labels or training data are read.
+brain HAR {
+  senses 561
+  neurons hidden 16 tanh
+  neurons activity 6 linear
+}
+load_model "har_model.nlw"
+tune full
+predict_data "har_test.txt" samples 2947

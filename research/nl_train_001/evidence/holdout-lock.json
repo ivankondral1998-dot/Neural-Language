@@ -1,0 +1,13 @@
+{
+  "pilot": {
+    "accuracy": 0.9422903516681695,
+    "rows": 1109
+  },
+  "architecture": "561-16 tanh-6 linear",
+  "epochs": 20,
+  "rate": 0.01,
+  "seed": 20261110,
+  "init": 42,
+  "train_nir_sha256": "2ec3b09a37e4afa966f035f2d8b098fdf15120357cdbabedc88f5132d61e09c0",
+  "infer_nir_sha256": "d7159431f6735329bc14c021b67c9a9f4b728e701b3fe0fb4ebe82928a1b12a7"
+}

@@ -1,0 +1,63 @@
+{
+  "android_binary_bytes": 885296,
+  "compiler_and_runtime_sha256": {
+    "language/compiler.py": "055e74501d6ca7b8467c2938f9957bd495f19cf9ee4de16f1e1b518a824e8ac6",
+    "language/runtime/neural_dataset.hpp": "ce721d552ff823dab09b7766f7a2b6e3d0a4d4f88068a4528ef53c241ba1ac5c",
+    "language/runtime/neural_runtime.hpp": "28f8e235dad6eeb249b8905d2afc781ce835cd6bb03b3232850bcf296a4580b6"
+  },
+  "executables": {
+    "clang/infer": {
+      "bytes": 75520,
+      "sha256": "f5b6ac3ca113d9cb2e3f66c4ce6cc2a68a1972adecc9d0684cb2370230a032db"
+    },
+    "clang/train": {
+      "bytes": 71352,
+      "sha256": "25d9b6d40228b28bb120f37696c5c1a5b3b86541ba37db896c828c7c294772ed"
+    },
+    "native/infer": {
+      "bytes": 88536,
+      "sha256": "5803b4a298a5d23798548363fce26c7cbdc5a1ecd19194e40ad1aa822ce6a2e4"
+    },
+    "native/train": {
+      "bytes": 80616,
+      "sha256": "36329531292b39c64fd92a455c8d608b470b2e46caeaab4bd45bc8b2a6778245"
+    }
+  },
+  "fp64_checkpoint_bytes": 206653,
+  "host_archive": {
+    "bytes": 513896,
+    "sha256": "e0a8b392bd3a64da666e65ec654ecc8740954415c68a93a4a2f16c9c19a19fac"
+  },
+  "measurements": {
+    "clang": {
+      "infer": {
+        "peak_rss_kib": 14976,
+        "wall_seconds": 0.3923236660002658
+      },
+      "train": {
+        "peak_rss_kib": 34560,
+        "wall_seconds": 7.422869354999875
+      },
+      "trained_sha256": "30d0fbf1c19b30d8e608f79f74a87461ba75d84221732c07b6caaad7bb93a331"
+    },
+    "native": {
+      "infer": {
+        "peak_rss_kib": 14976,
+        "wall_seconds": 0.35838652399979765
+      },
+      "train": {
+        "peak_rss_kib": 34564,
+        "wall_seconds": 5.729297883000072
+      },
+      "trained_sha256": "30d0fbf1c19b30d8e608f79f74a87461ba75d84221732c07b6caaad7bb93a331"
+    },
+    "repeat": {
+      "train": {
+        "peak_rss_kib": 34564,
+        "wall_seconds": 5.666202412000075
+      },
+      "trained_sha256": "30d0fbf1c19b30d8e608f79f74a87461ba75d84221732c07b6caaad7bb93a331"
+    }
+  },
+  "quantized_checkpoint_bytes": 203240
+}

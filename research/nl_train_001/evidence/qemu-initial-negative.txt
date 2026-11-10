@@ -1,0 +1,2 @@
+First static NDK link (before explicit native TLS alignment) exited 134 under QEMU.
+Bionic reported TLS alignment 8, requiring 64 on ARM64. build_arm64.py now supplies native TLS alignment on the separate static emulation build.

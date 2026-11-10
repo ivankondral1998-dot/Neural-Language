@@ -1,0 +1,11 @@
+# UCI HAR. The file contains zero-based labels and 561 published features.
+brain HAR {
+  senses 561
+  neurons hidden 16 tanh
+  neurons activity 6 linear
+  init 42
+}
+tune full
+save_model "har_initial.nlw"
+train_data "har_train.txt" samples 7352 epochs 20 rate 0.01 seed 20261110
+save_model "har_model.nlw"

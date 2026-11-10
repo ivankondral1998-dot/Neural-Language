@@ -1,0 +1,9 @@
+Fixed before test evaluation: 561-16 tanh-6 linear, init 42, rate 0.01,
+20 epochs, shuffle seed 20261110. Pilot on official train only, last
+three sorted training subject IDs held out, quality floor 0.80.
+Same independent FP64 MSE/SGD and fixed examples for final comparison.
+Numeric tolerance for final parameters/logits 2e-8 absolute; exact
+repeat weights within same binary. Native C++ timings same weights,
+same test rows, same flags, no parse/output within timed inference.
+Optional representation probe, evaluation only: same trained FP64 model
+rounded to the existing symmetric INT8 1/127 representation, no retuning.

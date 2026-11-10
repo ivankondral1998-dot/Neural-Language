@@ -1,0 +1,20 @@
+{
+  "absolute_logit_tolerance": 2e-08,
+  "architecture": "arm64-v8a",
+  "archive_bytes": 8530519,
+  "archive_sha256": "be3fca53bbc39a37993bf43df02317857503c50d0dc6d74d592ccd7980ad22e4",
+  "binary_sha256": "ab0738c4d1f60643fbdfd1590527d65d3cfaf56411010115b46b1cbe0a6e847f",
+  "compiler_sha256": "055e74501d6ca7b8467c2938f9957bd495f19cf9ee4de16f1e1b518a824e8ac6",
+  "data_sha256": "7addb1636519a2e35906c7bc0c5430e5371f14043c169e574cf028135ccf49ce",
+  "device_status": "DEVICE_NOT_TESTED",
+  "generated_cpp_sha256": "f6344a44ad7ce9e95d963b6cd7f7d2c0fadc96ea5cc141b0aeeb03fd255aae69",
+  "ir_sha256": "f5a621c14c022a92b8230b891ede4e261caf077cde1959f82adefefa7f797794",
+  "model_sha256": "30d0fbf1c19b30d8e608f79f74a87461ba75d84221732c07b6caaad7bb93a331",
+  "ndk_clang": "Android (13691557, +pgo, +bolt, +lto, +mlgo, based on r522817d) clang version 18.0.4 (https://android.googlesource.com/toolchain/llvm-project d8003a456d14a3deb8054cdaa529ffbf02d9b262)",
+  "qemu_check": {
+    "output": "HAR_PASS rows=2947 correct=2712 accuracy=0.920257889 max_abs_logit_error=7.54951656745e-15",
+    "scope": "same generated source; separate static Bionic link",
+    "static_elf_sha256": "84758a31f70669823d07f0b37e59c37b1bd23f3cf9844efef0e7b6d3f63f34c0"
+  },
+  "target": "aarch64-linux-android26"
+}
