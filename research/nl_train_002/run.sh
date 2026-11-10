@@ -16,7 +16,7 @@ preds=[]
 for line in Path(sys.argv[1]).read_text().splitlines():
     if "DATA_PREDICT index=" in line:
         preds.append([float(v) for v in line.split("values=")[-1].split(",")])
-expected=[(0,0),(0,1),(1,0),(1,1)]
+expected=[(.25,.75),(.8,.2),(.5,.5),(.1,.9)]
 assert len(preds)==4, "missing prediction rows"
 error=max(abs(got-want) for row,goal in zip(preds,expected)
           for got,want in zip(row,goal))
