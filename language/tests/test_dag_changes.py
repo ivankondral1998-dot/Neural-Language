@@ -74,6 +74,27 @@ class DAGShapeAndChanges(unittest.TestCase):
                 emit(item)
             with self.assertRaises(CompileError):analyze_ir(item)
 
+    def test_codegen_rejects_dag_operations_even_with_recomputed_effects(self):
+        from compiler import validate_semantics
+
+        for name, rounds in (("verify", 20), ("advise", 20), ("optimize", 90)):
+            ir = parse(GRAPH + "observe [0,0,0,0]\ncycle 2 {\npredict\n}\n")
+            ir["operations"][1]["body"][0].update(op=name, rounds=rounds)
+            ir["semantic_contract"] = validate_semantics(ir["operations"])
+            with self.subTest(name=name), self.assertRaisesRegex(CompileError, "not implemented"):
+                emit(ir)
+
+    def test_codegen_reports_malformed_ir_as_compile_error(self):
+        ir = parse(GRAPH + OPS)
+        bad_cases = (
+            None, {},
+            dict(ir, operations=[{"op": []}]),
+            dict(ir, operations=[{"op": "observe", "line": 1, "values": [10**1000, 0, 0, 0]}]),
+        )
+        for index, bad in enumerate(bad_cases):
+            with self.subTest(index=index), self.assertRaises(CompileError):
+                emit(bad)
+
     def test_snapshot_and_effect_lifetimes(self):
         program=GRAPH+('observe [0.1,0.2,0.3,-0.4]\nremember x\n'
                        'observe_delta 2 add 0.02\nrewind x\nobserve_delta 2 add 0.03\npredict\n')

@@ -78,8 +78,28 @@ struct Layer {
     } else w[i]=value;
   }
 };
+inline bool uses_blas(const Layer& layer) {
+    return has_blas && layer.storage==0 && layer.disabled==0 && layer.w.size()>=256;
+}
+
+// The scalar reference and strict recomputation share the same reduction.
+// Dispatch outside the full-pass row loop so the dense kernel stays simple.
+template<bool Dense>
+inline double scalar_preactivation(const Layer& layer, const std::vector<double>& input, int row) {
+    const size_t base=static_cast<size_t>(row)*layer.in;
+    double total=layer.b[static_cast<size_t>(row)];
+    if constexpr (Dense) {
+        const double* const weights=layer.w.data()+base;
+        const double* const x=input.data();
+        for(int col=0;col<layer.in;++col)total+=weights[col]*x[col];
+    } else {
+        for(int col=0;col<layer.in;++col)total+=layer.effective(base+col)*input[col];
+    }
+    finite(total,"forward activation");
+    return total;
+}
 struct Counters {size_t full=0,delta=0,train=0,events=0,auto_full=0,auto_delta=0,blas_layers=0;size_t input_events=0,input_delta=0,input_auto_full=0;};
-struct Snapshot {std::vector<Layer> layers;uint64_t version;std::vector<double> input;bool has_input;};
+struct Snapshot {std::vector<Layer> layers;uint64_t version;std::vector<double> input;bool has_input,graph;};
 class Model {
 public:
   std::string name; int ninput;std::vector<Layer> layers; std::vector<double> input;
@@ -112,6 +132,7 @@ public:
     std::mt19937 rng(seed);std::uniform_real_distribution<double> dis(-0.35,0.35);
     for(size_t i=0;i<total;i++)l.assign_weight(i,dis(rng));
     layers.push_back(std::move(l));
+    invalidate_cache();
     z.resize(layers.size());a.resize(layers.size());
   }
   // Explicit DAG sources. Parent order defines concatenation offsets.
@@ -137,14 +158,20 @@ public:
     }
     require(static_cast<size_t>(in)*static_cast<size_t>(out)<=4000000,"graph weight budget exceeded");
     const int sequential=layers.empty()?-1:static_cast<int>(layers.size()-1);
-    if(indices.size()!=1||indices[0]!=sequential)graph=true;
     Layer l;l.name=std::move(nm);l.in=in;l.out=out;l.type=type;l.storage=storage;l.sources=indices;
     const size_t count=static_cast<size_t>(in)*out;
     if(storage)l.q.resize(count);else l.w.resize(count);
     l.enabled.assign(count,1);l.b.assign(out,0.0);
     std::mt19937 rng(seed);std::uniform_real_distribution<double> dis(-0.35,0.35);
     for(size_t i=0;i<count;i++)l.assign_weight(i,dis(rng));
-    layers.push_back(std::move(l));z.resize(layers.size());a.resize(layers.size());
+    layers.push_back(std::move(l));
+    if(indices.size()!=1||indices[0]!=sequential)graph=true;
+    invalidate_cache();
+    z.resize(layers.size());a.resize(layers.size());
+  }
+  void invalidate_cache() {
+    cache=false;cache_canonical=false;
+    pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;
   }
   const std::vector<double>& layer_input(size_t k,std::vector<double>& combined)const {
     const Layer& l=layers[k];
@@ -252,30 +279,21 @@ public:
       const auto& l=layers[k];std::vector<double> combined;
       const auto& prev=graph?layer_input(k,combined):(k?a[k-1]:input);
       if((int)z[k].size()!=l.out){z[k].assign(l.out,0);a[k].assign(l.out,0);} else {std::fill(z[k].begin(),z[k].end(),0.0);std::fill(a[k].begin(),a[k].end(),0.0);}
-      const bool blas = has_blas && l.storage==0 && l.disabled==0 && l.w.size()>=256;
-      if(blas) {
+      if(uses_blas(l)) {
         blas_gemv(l.out,l.in,l.w.data(),prev.data(),z[k].data());
         counters.blas_layers++;
         for(int r=0;r<l.out;r++) {
           z[k][r]+=l.b[r];finite(z[k][r],"forward activation");a[k][r]=act(z[k][r],l.type);
         }
       } else if(l.storage==0 && l.disabled==0) {
-        // Guarded dense FP64 kernel: all edges active, so avoid a per-weight
-        // mask lookup and dynamic storage dispatch in the hot inner loop.
-        // Preserve the original accumulation order and per-row validation.
-        const double* const x=prev.data();
-        const double* const weights=l.w.data();
         for(int r=0;r<l.out;r++){
-          double total=l.b[static_cast<size_t>(r)];
-          const double* const row=weights+static_cast<size_t>(r)*l.in;
-          for(int c=0;c<l.in;c++)total+=row[c]*x[c];
-          finite(total,"forward activation");z[k][r]=total;a[k][r]=act(total,l.type);
+          const double total=scalar_preactivation<true>(l,prev,r);
+          z[k][r]=total;a[k][r]=act(total,l.type);
         }
       } else {
         for(int r=0;r<l.out;r++){
-          double total=l.b[r];size_t base=static_cast<size_t>(r)*l.in;
-          for(int c=0;c<l.in;c++) total+=l.effective(base+c)*prev[c];
-          finite(total,"forward activation");z[k][r]=total;a[k][r]=act(total,l.type);
+          const double total=scalar_preactivation<false>(l,prev,r);
+          z[k][r]=total;a[k][r]=act(total,l.type);
         }
       }
     }
@@ -321,7 +339,7 @@ public:
       forward();return;
     }
     for(const auto& l:layers)
-      if(has_blas && l.storage==0 && l.disabled==0 && l.w.size()>=256) {
+      if(uses_blas(l)) {
         if(mode==AUTO){counters.auto_full++;if(!pending_input.empty())counters.input_auto_full++;}
         forward();return;
       }
@@ -364,15 +382,9 @@ public:
             }
         if(!affected)continue;
         const double old=a[k][static_cast<size_t>(r)];
-        double total=l.b[static_cast<size_t>(r)];
-        if(l.storage==0 && l.disabled==0){
-          const double* const row=l.w.data()+base;
-          const double* const x=prev.data();
-          for(int c=0;c<l.in;c++)total+=row[c]*x[c];
-        }else{
-          for(int c=0;c<l.in;c++)total+=l.effective(base+static_cast<size_t>(c))*prev[static_cast<size_t>(c)];
-        }
-        finite(total,"strict sparse activation");
+        const double total=l.storage==0 && l.disabled==0
+          ? scalar_preactivation<true>(l,prev,r)
+          : scalar_preactivation<false>(l,prev,r);
         z[k][static_cast<size_t>(r)]=total;
         const double activation=act(total,l.type);
         a[k][static_cast<size_t>(r)]=activation;
@@ -557,6 +569,7 @@ public:
       cache=false;pending_input.clear();pending.clear();pending_layer=-1;delta_streak=0;
     }
     const double old=L.effective(ix);const int old_gate=L.enabled[ix];
+    const bool was_blas=uses_blas(L);
     // If the edit crosses layers, a single-layer batch cannot capture all
     // dependencies; invalidate and recover with a mathematically full pass.
     if(!pending.empty() && pending_layer!=l){cache=false;pending.clear();pending_layer=-1;delta_streak=0;}
@@ -569,6 +582,9 @@ public:
     // Delta must use the rounded, effective weight, not the unquantized request.
     const double updated=L.effective(ix);
     version++;counters.events++;
+    // A gate may change the reduction for every row, even when its own
+    // effective weight is zero. Recompute before treating the edit as a no-op.
+    if(was_blas!=uses_blas(L)){invalidate_cache();return;}
     if(old==updated){if(cache&&pending.empty())cache_version=version;return;}
     if(mode==FULL || !cache) {cache=false;pending.clear();pending_layer=-1;return;}
     if(pending.empty())pending_layer=l;
@@ -664,8 +680,16 @@ public:
     layers.swap(staged_layers); // no-throw commit
     version++;cache=false;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;counters.train++;
   }
-  void checkpoint(const std::string& label){require(saved.count(label)==0,"checkpoint already exists; use a new name");require(saved.size()<64,"checkpoint limit");saved[label]=Snapshot{layers,version,input,has_input};std::cout<<"CHECKPOINT "<<label<<" version="<<version<<"\n";}
-  void restore(const std::string& label){auto it=saved.find(label);require(it!=saved.end(),"unknown checkpoint: "+label);layers=it->second.layers;input=it->second.input;has_input=it->second.has_input;version++;cache=false;pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;std::cout<<"RESTORE "<<label<<" version="<<version<<"\n";}
+  void checkpoint(const std::string& label){require(saved.count(label)==0,"checkpoint already exists; use a new name");require(saved.size()<64,"checkpoint limit");saved[label]=Snapshot{layers,version,input,has_input,graph};std::cout<<"CHECKPOINT "<<label<<" version="<<version<<"\n";}
+  void restore(const std::string& label){
+    auto it=saved.find(label);
+    require(it!=saved.end(),"unknown checkpoint: "+label);
+    const Snapshot& snapshot=it->second;
+    layers=snapshot.layers;input=snapshot.input;has_input=snapshot.has_input;graph=snapshot.graph;
+    z.resize(layers.size());a.resize(layers.size());
+    version++;invalidate_cache();
+    std::cout<<"RESTORE "<<label<<" version="<<version<<"\n";
+  }
   void expect(const std::vector<double>& expected,double tol) {
     require(std::isfinite(tol) && tol>=0.0,"expect tolerance must be finite and nonnegative");
     for(double value:expected)require(std::isfinite(value),"expect target must be finite");

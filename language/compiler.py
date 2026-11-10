@@ -233,13 +233,6 @@ def parse(text):
             if n>1000000:raise CompileError("program exceeds one million operations")
         return n
     steps=cost(program)
-    if graph:
-        def reject_graph_bench(items):
-            for op in items:
-                if op['op']=='cycle':reject_graph_bench(op['body'])
-                elif op['op'] in ('advise','verify','optimize'):
-                    fail(op['line'],op['op']+' not implemented for DAG graphs')
-        reject_graph_bench(program)
     if not program: raise CompileError("brain needs executable instructions")
     # Shared state/effect semantics, including restored input in snapshots.
     # The NeuralEffects/1 metadata is additive and does not change native code.
@@ -409,7 +402,7 @@ def verify_typed_ir(ir):
         return value
 
     def real(value, label, lo=None, hi=None):
-        require(type(value) in (int, float) and math.isfinite(value) and abs(value) < 1e9,
+        require(type(value) in (int, float) and abs(value) < 1e9,
                 label + ' invalid numeric value')
         if lo is not None: require(value >= lo, label + ' below valid range')
         if hi is not None: require(value <= hi, label + ' above valid range')
@@ -451,7 +444,7 @@ def verify_typed_ir(ir):
     for index,layer in enumerate(layers):
         require(type(layer) is dict, f'layer {index} must be an object')
         name=identifier(layer.get('name'), f'layer {index} name')
-        require(name not in shapes, f'duplicate neuron layer: {name}')
+        require(name != 'input' and name not in shapes, f'duplicate or reserved neuron layer: {name}')
         size=uint(layer.get('size'),1,4096,f'layer {index} size')
         activation=layer.get('activation')
         require(type(activation) is str and activation in ('linear','relu','sigmoid','tanh'),
@@ -532,6 +525,8 @@ def verify_typed_ir(ir):
             require(type(kind) is str and (kind in _EFFECTS or kind=='cycle'),
                     'unsupported IR operation')
             uint(op.get('line'),1,5000,f'{kind} line')
+            if graph and kind in ('advise','verify','optimize'):
+                fail(op['line'],kind+' not implemented for DAG graphs')
             if kind=='cycle':
                 count=uint(op.get('count'),1,100000,'cycle count')
                 body=op.get('body')
@@ -580,7 +575,10 @@ def verify_typed_ir(ir):
                 elif kind=='advise':uint(op.get('rounds'),10,100000,'advise rounds')
                 elif kind=='verify':uint(op.get('rounds'),2,2000,'verify rounds')
                 elif kind=='optimize':uint(op.get('rounds'),20,2000,'optimize rounds')
-                elif kind in ('remember','rewind'):identifier(op.get('name'),kind+' checkpoint')
+                elif kind in ('remember','rewind'):
+                    label=op.get('name')
+                    require(type(label) is str and IDENT.fullmatch(label) is not None,
+                            'checkpoint name invalid')
                 elif kind in ('save_model','load_model','report'):filename(op.get('filename'),kind)
                 # predict and inspect carry no operands
             require(cost <= 1000000,'program exceeds one million operations')
@@ -619,8 +617,8 @@ def verify_neural_changes(ir):
 
     This is deliberately narrow; it is not a general-purpose typed DAG verifier.
     """
-    verify_semantic_contract(ir)
     verify_typed_ir(ir)
+    verify_semantic_contract(ir)
     brain=ir.get('brain')
     if not isinstance(brain,dict):raise CompileError('NeuralChanges: missing brain')
     senses=brain.get('senses')

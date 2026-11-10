@@ -36,8 +36,49 @@ static void equal(const neural::Model& ref,const neural::Model& test,int i){
     }
   }
 }
+static void check_topology_invalidation() {
+  for (bool graph : {false, true}) {
+    neural::Model m("Extend", 1);
+    m.layer("first", 1, 0, 1);
+    m.observe({1.});
+    const auto before = m.infer(false);
+    m.checkpoint("first_only");
+    if (graph) m.layer_sources("new_out", 1, 0, 2, 0, {"first", "input"});
+    else m.layer("new_out", 1, 0, 2);
+    const auto output = m.infer(false);
+    m.forward();
+    if (output.size() != 1 || output != m.infer(false))
+      throw std::runtime_error("topology change reused a stale cache");
+    m.restore("first_only");
+    if (m.graph || m.infer(false) != before)
+      throw std::runtime_error("restore did not reinstate the saved topology");
+  }
+}
+
+static void check_failure_recovery() {
+  for (auto mode : {neural::Model::FULL, neural::Model::AUTO, neural::Model::DELTA}) {
+    neural::Model m("Recovery", 2);
+    m.layer("out", 2, 0, 1);
+    m.layers[0].w = {1., 1., 2., 0.};
+    m.mode = mode;
+    m.observe({0., 1.});
+    m.infer(false);
+    m.change_input(0, 600000000.);
+    std::string error;
+    try { m.infer(false); }
+    catch (const std::runtime_error& e) { error = e.what(); }
+    if (error != "invalid numeric value: forward activation" || m.cache)
+      throw std::runtime_error("forward failure must match FULL and invalidate the cache");
+    m.change_input(0, -600000000.);
+    if (m.infer(false) != std::vector<double>{1., 0.})
+      throw std::runtime_error("inference failed to recover after a rejected result");
+  }
+}
+
 int main() {
   try {
+    check_topology_invalidation();
+    check_failure_recovery();
     int checks=0;
     for(bool graph:{false,true})for(bool int8:{false,true}){
       neural::Model reference=make(graph,int8),partial=reference;

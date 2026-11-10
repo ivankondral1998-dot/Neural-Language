@@ -1,0 +1,26 @@
+Source: independently compiled .nir, GCC 14.2, Linux x86-64.
+The two strings per line are PREDICT before and after observe_delta.
+five original full ['0', '5']
+five original incremental ['0', '0']
+five heuristic full ['0', '5']
+five heuristic incremental ['0', '5']
+five canonical full ['0', '5']
+five canonical incremental ['0', '5']
+zero original full ['0', '0']
+zero original incremental ['0', '1']
+zero heuristic full ['0', '0']
+zero heuristic incremental ['0', '0']
+zero canonical full ['0', '0']
+zero canonical incremental ['0', '0']
+heuristic-miss original full ['0', '9999999.963']
+heuristic-miss original incremental ['0', '10000000']
+heuristic-miss heuristic full ['0', '9999999.963']
+heuristic-miss heuristic incremental ['0', '10000000']
+heuristic-miss canonical full ['0', '9999999.963']
+heuristic-miss canonical incremental ['0', '9999999.963']
+
+Independent RED tests against 93993148, before changes:
+BLAS transition: 5/6 GCC combinations failed after first valid prediction.
+Tampered DAG IR accepted all 3 forbidden instructions.
+Malformed IR raised 3 Python errors outside CompileError.
+CANONICAL_TRACE_FAIL topology change reused a stale cache
