@@ -183,9 +183,9 @@ def parse(text):
                 out.append({'op':'observe_delta','index':integer(mo.group(1),line,0,senses-1),
                             'delta':num(mo.group(2),line),'line':line});continue
             mo=re.fullmatch(r'(train_data|predict_data)\s+(".*")\s+samples\s+(\d+)'
-                            r'(?:\s+epochs\s+(\d+)\s+rate\s+(\S+)\s+seed\s+(\d+))?',s)
+                            r'(?:\s+epochs\s+(\d+)\s+rate\s+(\S+)\s+seed\s+(\d+))?(?:\s+targets\s+(vector))?',s)
             if mo:
-                kind, source, samples, epochs, rate, shuffle_seed = mo.groups()
+                kind, source, samples, epochs, rate, shuffle_seed, target_mode = mo.groups()
                 if (kind == 'train_data') != (epochs is not None):
                     fail(line, 'train_data requires epochs, rate and seed; predict_data takes only samples')
                 op={'op':kind,'filename':quoted(source,line),
@@ -193,6 +193,9 @@ def parse(text):
                 if epochs is not None:
                     op.update(epochs=integer(epochs,line,1,1000),rate=num(rate,line),
                               seed=integer(shuffle_seed,line,0,4294967295))
+                if target_mode is not None:
+                    if kind != 'train_data': fail(line,'targets vector requires train_data')
+                    op['target_mode'] = 'vector'
                 out.append(op)
                 continue
             if s=='predict':out.append({'op':'predict','line':line});continue
@@ -574,18 +577,26 @@ def verify_typed_ir(ir):
                 elif kind in _DATA_OPS:
                     filename(op.get('filename'),kind)
                     samples=uint(op.get('samples'),1,_MAX_DATA_SAMPLES,kind+' samples')
-                    require(samples*senses <= _MAX_DATA_ELEMENTS,kind+' dataset element limit exceeded')
+                    columns=senses+(prev if op.get('target_mode')=='vector' else 0)
+                    require(samples*columns <= _MAX_DATA_ELEMENTS,kind+' dataset element limit exceeded')
                     signature={'features':{'dtype':'f64','rank':2,'columns':senses}}
                     if kind=='train_data':
-                        require(prev>=2,'train_data requires at least two output classes')
+                        is_vector=op.get('target_mode')=='vector'
+                        if 'target_mode' in op:
+                            require(is_vector,'train_data invalid target mode')
+                        if not is_vector:
+                            require(prev>=2,'train_data requires at least two output classes')
                         uint(op.get('epochs'),1,1000,'train_data epochs')
                         uint(op.get('seed'),0,4294967295,'train_data seed')
                         real(op.get('rate'),'train_data rate',0,1)
                         require(op['rate']>0,'train_data rate must be positive')
-                        signature.update(label={'dtype':'i32','classes':prev},rate='f64',
-                                         epochs='u32',seed='u32')
+                        if is_vector:
+                            signature['targets']={'dtype':'f64','shape':[prev]}
+                        else:
+                            signature['label']={'dtype':'i32','classes':prev}
+                        signature.update(rate='f64',epochs='u32',seed='u32')
                     else:
-                        require(not {'epochs','rate','seed'}.intersection(op),
+                        require(not {'epochs','rate','seed','target_mode'}.intersection(op),
                                 'predict_data cannot carry training operands')
                         signature['logits']={'dtype':'f64','columns':prev}
                     signatures[kind]=signature
@@ -786,7 +797,8 @@ def emit(ir):
             elif o=='observe_delta':lines.append(f'brain.change_input({x["index"]},{number(x["delta"])});')
             elif o=='predict':lines.append('brain.infer();')
             elif o=='train_data':
-                lines.append(f'neural::train_data(brain,{string(x["filename"])},{x["samples"]},{x["epochs"]},{number(x["rate"])},{x["seed"]}u);')
+                extra=',true' if x.get('target_mode')=='vector' else ''
+                lines.append(f'neural::train_data(brain,{string(x["filename"])},{x["samples"]},{x["epochs"]},{number(x["rate"])},{x["seed"]}u{extra});')
             elif o=='predict_data':
                 lines.append(f'neural::predict_data(brain,{string(x["filename"])},{x["samples"]});')
             elif o=='learn':lines.append(f'brain.learn({vec(x["values"])},{number(x["rate"])});')
