@@ -266,16 +266,23 @@ public:
         const double* const weights=l.w.data();
         for(int r=0;r<l.out;r++){
           double total=l.b[static_cast<size_t>(r)];
-          double max_term=std::abs(total);
           const double* const row=weights+static_cast<size_t>(r)*l.in;
-          for(int c=0;c<l.in;c++){
-            const double term=row[c]*x[c];
-            total+=term;
-            max_term=std::max(max_term,std::abs(term));
+          if(mode==FULL){
+            // Canonical FULL retains the original hot loop; a later switch
+            // to DELTA must first rebuild a certified cache in that mode.
+            cache_incremental_safe=false;
+            for(int c=0;c<l.in;c++)total+=row[c]*x[c];
+          }else{
+            double max_term=std::abs(total);
+            for(int c=0;c<l.in;c++){
+              const double term=row[c]*x[c];
+              total+=term;
+              max_term=std::max(max_term,std::abs(term));
+            }
+            if(max_term>std::max(1.0,std::abs(total))*1.e8)
+              cache_incremental_safe=false;
           }
           finite(total,"forward activation");
-          if(max_term>std::max(1.0,std::abs(total))*1.e8)
-            cache_incremental_safe=false;
           z[k][r]=total;a[k][r]=act(total,l.type);
         }
       } else {
