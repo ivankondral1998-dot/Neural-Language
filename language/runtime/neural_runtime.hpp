@@ -253,6 +253,27 @@ public:
     }
     input=std::move(x);
   }
+  // Opt-in zero-allocation input replacement for a compiler-selected FULL
+  // inference profile. The caller retains ownership; after the initial bind,
+  // input capacity is reused instead of allocating a by-value argument for
+  // every observation. Validate the entire row before touching model state.
+  // Other modes must use observe() to preserve change-aware semantics.
+  void observe_full_reuse(const std::vector<double>& x) {
+    require(mode==FULL,"observe_full_reuse requires FULL mode");
+    require((int)x.size()==ninput,"input shape mismatch");
+    for(double v:x)finite(v,"input");
+    if(!has_input) {
+      input.assign(x.begin(),x.end());
+      has_input=true;
+      return;
+    }
+    if(x==input)return;
+    invalidate_cache();
+    // In the bound state input always has ninput values. Copy in place, so
+    // repeated fixed-shape observations do not allocate a fresh vector.
+    require((int)input.size()==ninput,"bound input shape mismatch");
+    std::copy(x.begin(),x.end(),input.begin());
+  }
   // A new language-level input patch. An existing observe is required.
   // Consecutive changes are staged and propagated as a single batch on demand.
   void change_input(int col,double requested){
