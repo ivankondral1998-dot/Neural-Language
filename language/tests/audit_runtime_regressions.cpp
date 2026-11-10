@@ -86,6 +86,19 @@ static void mixed_events_defer_intermediate_error() {
   equal(m.infer(false)[0],0.0,"mixed events final result");
 }
 
+static void mixed_input_then_weight_defers_error() {
+  neural::Model m("ReverseMixed",1);
+  m.layer("out",1,0,3);
+  zero_weights(m);
+  m.layers[0].w[0]=2.0;
+  m.mode=neural::Model::AUTO;
+  m.observe({400000000.0});
+  equal(m.infer(false)[0],800000000.0,"reverse mixed precondition");
+  m.change_input(0,200000000.0);  // intermediate output 1.2e9 invalid
+  m.change("out",0,0,-2.0);        // final weight=0, output valid
+  equal(m.infer(false)[0],0.0,"reverse mixed events final result");
+}
+
 static void failed_learn_is_atomic(bool graph) {
   neural::Model m("TrainingException",2);
   if(graph) {
@@ -131,6 +144,8 @@ int main() {
     std::cout<<"MODE_SWITCH_RECANONICALIZE_PASS\n";
     mixed_events_defer_intermediate_error();
     std::cout<<"MIXED_EVENTS_PASS\n";
+    mixed_input_then_weight_defers_error();
+    std::cout<<"MIXED_REVERSE_PASS\n";
     failed_learn_is_atomic(false);
     std::cout<<"SGD_CHAIN_ATOMIC_PASS\n";
     failed_learn_is_atomic(true);
