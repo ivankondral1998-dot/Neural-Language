@@ -9,12 +9,13 @@ No changes to `main`; no GitHub Actions, merges, deletes or APK releases.
 Before changing the runtime, compiled `language/tests/runtime_semantic_safety.cpp`
 with GCC `-std=c++17 -O2 -Wall -Wextra -Werror` against the **original**
 runtime blob `4dd25818fb5643ad425c8c26628c4868c20f7701`.
-All 8 cases failed:
+All **9/9 cases failed** on the original runtime (confirmed again after adding DAG SGD):
 - cancellation: chained DELTA/AUTO, DAG DELTA/AUTO (expected 5, actual 0);
 - FULL after incremental: no fresh canonical pass;
 - mixed edits: weight→input and input→weight each caused premature
   invalid intermediate calculation;
-- failed SGD: weights mutated partially before exception.
+- failed SGD: weights mutated partially before exception in both sequential
+  and branched DAG models.
 
 ## Implemented changes (NOT a global numeric proof)
 
@@ -38,7 +39,7 @@ Runtime blob: `e7e8d53d44a1c5bde00c1dc65dfc3f800dde5600`.
 ## Executed verification in isolated Linux x86-64 sandbox
 
 Original 40 text source files verified against Git blob SHAs.
-- Regression program: **8/8 PASS** using both `g++` and `clang++`;
+- Regression program: **9/9 PASS** using both `g++` and `clang++`;
   `-std=c++17 -O2 -Wall -Wextra -Werror`.
 - Two permanent Python tests, each testing both compilers:
   `python3 -m unittest tests.test_semantic_safety -v` **2/2 PASS**;
@@ -49,7 +50,7 @@ Original 40 text source files verified against Git blob SHAs.
   was already the patched version. The two new tests ran separately.
 - `bash run.sh`: **END_TO_END_PASS** for actual .nir training, checkpoint
   save, separately compiled inference and heldout oracle.
-- Clang `-fsanitize=address,undefined` new eight-case regression **PASS**,
+- Clang `-fsanitize=address,undefined` new nine-case regression **PASS**,
   no sanitizer failure or leak diagnostic in this run.
 - Native stress with Clang:
   `CHANGE_INPUT_STRESS_PASS comparisons=64512
@@ -67,5 +68,6 @@ kernel, not for this new branch. No TFLite or ONNX comparison.
 
 1. Formally bound DELTA rounding and cache provenance, or use strict FULL
    fallback wherever that bound cannot guarantee the target tolerance.
-2. Add exception tests to graph SGD and IR tamper tests as separate items.
+2. Add negative/tampered IR tests and end-to-end update-order cases beyond
+   the present C++ runtime surface.
 3. Then design compiler-generated streaming `.nir` steps and compare on A52.
