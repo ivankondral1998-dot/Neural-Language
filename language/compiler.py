@@ -748,6 +748,8 @@ def analyze_ir(ir):
         messages.append('No native advise command; strategy performance has not been measured.')
     if counts['advise']:
         messages.append('Advise compares runtime full and delta paths on synthetic edits; full may use BLAS with --blas.')
+    if ir.get('compute_plan'):
+        messages.append('mobile-cpu plan specializes sequential dense FP64 inference: four independent rows, same left-to-right reduction as FULL. Not an INT8 kernel and not a phone measurement.')
     return {'operations':counts,'weights':weights,
             'minimum_weight_storage_bytes_fp64':weights*8,
             'actual_weight_bytes':b['weight_bytes'],
@@ -765,8 +767,103 @@ def vec(v):
 def string(s):
     return json.dumps(s,ensure_ascii=False)
 
+_ACT_CODE = {'linear': 0, 'relu': 1, 'sigmoid': 2, 'tanh': 3}
+
+def make_mobile_plan(ir):
+    """Compiler-side sequential dense FP64 plan. Rejects shapes it cannot specialize."""
+    brain = ir.get('brain')
+    if not isinstance(brain, dict):
+        raise CompileError('mobile-cpu profile requires a brain')
+    if brain.get('graph'):
+        raise CompileError('mobile-cpu profile supports sequential dense FP64 only, not a DAG')
+    layers_in = brain.get('neurons')
+    if not isinstance(layers_in, list) or not layers_in:
+        raise CompileError('mobile-cpu profile requires at least one layer')
+    width = brain.get('senses')
+    layers = []
+    for layer in layers_in:
+        if layer.get('storage', 'float') != 'float':
+            raise CompileError('mobile-cpu FP64 profile does not apply to int8 storage; use the generic profile')
+        if 'sources' in layer:
+            raise CompileError('mobile-cpu profile supports sequential layers only')
+        activation = layer.get('activation')
+        if activation not in _ACT_CODE:
+            raise CompileError('mobile-cpu profile has an unsupported activation')
+        out = layer.get('size')
+        layers.append({
+            'name': layer['name'],
+            'in': width,
+            'out': out,
+            'activation': activation,
+            'fusion': 'gemv_bias_activation',
+            'weight_order': 'row-major-fp64',
+            'reduction': 'left-to-right per row; up to 4 independent rows',
+        })
+        width = out
+    return {
+        'contract': 'NeuralPlan/1',
+        'profile': 'mobile-cpu',
+        'numeric': 'fp64-strict-row-order',
+        'fallback': 'generic Model::forward when any edge is disabled or storage is not fp64',
+        'blocking_rows': 4,
+        'lifetime': 'reuses Model.z and Model.a; no per-inference temporary vector',
+        'eliminated_from_hot_path': [
+            'storage and mask dispatch inside the row loop',
+            'runtime input width in the inner loop',
+            'per-inference temporary vectors',
+        ],
+        'not_claimed': [
+            'not INT8 inference',
+            'not a new matrix-multiplication algorithm',
+            'not a phone measurement',
+            'not an FMA contraction',
+        ],
+        'layers': layers,
+    }
+
+def verify_mobile_plan(ir):
+    plan = ir.get('compute_plan')
+    if plan is None:
+        return None
+    expected = make_mobile_plan(ir)
+    if plan != expected:
+        raise CompileError('NeuralPlan/1 does not match the brain')
+    return plan
+
+def mobile_function_source(ir):
+    brain = ir['brain']
+    senses = brain['senses']
+    layers = brain['neurons']
+    lines = [
+        'static bool nl_mobile_try(neural::Model& m){',
+        f'if(m.graph||m.layers.size()!={len(layers)}||m.ninput!={senses})return false;',
+    ]
+    width = senses
+    calls = []
+    for index, layer in enumerate(layers):
+        out = layer['size']
+        act = _ACT_CODE[layer['activation']]
+        lines.append(
+            f'if(m.layers[{index}].in!={width}||m.layers[{index}].out!={out}||'
+            f'm.layers[{index}].type!={act}||m.layers[{index}].storage!=0||'
+            f'm.layers[{index}].disabled!=0)return false;'
+        )
+        source = 'm.input.data()' if index == 0 else f'm.a[{index - 1}].data()'
+        calls.append(f'if((int)m.z[{index}].size()!={out}){{m.z[{index}].assign({out},0);m.a[{index}].assign({out},0);}}')
+        calls.append(
+            f'neural::mobile_dense_ilp4<{width},{out},{act}>('
+            f'm.layers[{index}].w.data(),m.layers[{index}].b.data(),{source},'
+            f'm.z[{index}].data(),m.a[{index}].data());'
+        )
+        width = out
+    lines.extend(calls)
+    lines.append('return true;')
+    lines.append('}')
+    return '\n'.join(lines)
+
 def emit(ir):
     verify_neural_changes(ir)
+    plan=verify_mobile_plan(ir)
     b=ir['brain']; lines=['#include "neural_runtime.hpp"','#include <exception>', 'int main() {','try {',f'neural::Model brain({string(b["name"])},{b["senses"]});']
     for k,l in enumerate(b['neurons']):
         typ={'linear':0,'relu':1,'sigmoid':2,'tanh':3}[l['activation']]
@@ -777,6 +874,8 @@ def emit(ir):
             lines.append(f'brain.layer_sources({string(l["name"])},{l["size"]},{typ},static_cast<uint32_t>({b["init"]}ULL+{k}*31337ULL),{store},{srcs});')
         else:
             lines.append(f'brain.layer({string(l["name"])},{l["size"]},{typ},static_cast<uint32_t>({b["init"]}ULL+{k}*31337ULL),{store});')
+    if plan is not None:
+        lines.append('brain.mobile_forward=&nl_mobile_try;')
     def block(ops,depth=0):
         for j,x in enumerate(ops):
             o=x['op']
@@ -808,6 +907,10 @@ def emit(ir):
     block(ir['operations'])
     if any(line.startswith(('neural::train_data(', 'neural::predict_data(')) for line in lines):
         lines.insert(1,'#include "neural_dataset.hpp"')
+    if plan is not None:
+        lines.insert(1,'#include "mobile_plan.hpp"')
+        main_at=lines.index('int main() {')
+        lines.insert(main_at, mobile_function_source(ir))
     lines+=['return 0;','} catch(const std::exception& e) {std::cerr<<"NEURAL ERROR: "<<e.what()<<"\\n";return 1;}','}']
     return '\n'.join(lines)+'\n'
 
@@ -818,11 +921,15 @@ def main(argv=None):
     ap.add_argument('--emit-only',action='store_true',help='generate C++ and IR, do not compile')
     ap.add_argument('--run',action='store_true',help='run the compiled executable')
     ap.add_argument('--compiler',default='g++')
+    ap.add_argument('--profile',choices=('generic','mobile-cpu'),default='generic',
+                    help='generic keeps the previous C++ path; mobile-cpu emits NeuralPlan/1')
     ap.add_argument('--blas',action='store_true',help='link optional optimized BLAS backend (NumPy OpenBLAS or system CBLAS)')
     args=ap.parse_args(argv)
     try:
         src=args.source.read_text(encoding='utf-8')
         ir=parse(src);ir['source_sha256']=hashlib.sha256(src.encode('utf-8')).hexdigest()
+        if args.profile=='mobile-cpu':
+            ir['compute_plan']=make_mobile_plan(ir)
         ir['compiler_advice']=analyze_ir(ir)
         out=args.output.resolve()
         cpp=out.with_suffix('.cpp')
@@ -851,7 +958,10 @@ def main(argv=None):
                 link=['-DNEURAL_RUNTIME_SCIPY_BLAS',str(so),f'-Wl,-rpath,{so.parent}']
             else:
                 link=['-DNEURAL_RUNTIME_CBLAS','-lblas']
-        subprocess.run([cxx,'-std=c++17','-O2','-ffp-contract=off','-Wall','-Wextra','-Werror','-I',str(runtime),str(cpp),*link,'-o',str(out)],check=True)
+        defines=[]
+        if ir.get('compute_plan'):
+            defines.append('-DNEURAL_MOBILE_PLAN')
+        subprocess.run([cxx,'-std=c++17','-O2','-ffp-contract=off','-Wall','-Wextra','-Werror',*defines,'-I',str(runtime),str(cpp),*link,'-o',str(out)],check=True)
         print('BUILT:',out)
         if args.run:
             r=subprocess.run([str(out)],cwd=out.parent)

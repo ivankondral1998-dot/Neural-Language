@@ -1,0 +1,11 @@
+task=har rows=2947
+MODEL_LOADED har_model.nlw version=1
+MODEL_LOADED har_model.nlw version=1
+MODEL_LOADED har_model.nlw version=1
+MODEL_LOADED har_model.nlw version=1
+impl=nl_generic_observe_infer p50_us=7.1269999999999998 p95_us=7.7549999999999999 allocs_per_sample=1 max_abs_vs_generic=0 correct=2712 class_mismatch_vs_generic=0 plan_calls=0
+impl=nl_mobile_observe_infer p50_us=4.9180000000000001 p95_us=5.1470000000000002 allocs_per_sample=1 max_abs_vs_generic=0 correct=2712 class_mismatch_vs_generic=0 plan_calls=23576
+impl=cpp_scalar_kernel p50_us=6.4400000000000004 p95_us=9.5820000000000007 allocs_per_sample=0 max_abs_vs_generic=0 correct=2712 class_mismatch_vs_generic=0 plan_calls=0
+impl=cpp_ilp_kernel p50_us=2.617 p95_us=2.79 allocs_per_sample=0 max_abs_vs_generic=0 correct=2712 class_mismatch_vs_generic=0 plan_calls=0
+impl=openblas_dgemv_kernel p50_us=1.3879999999999999 p95_us=1.714 allocs_per_sample=0 max_abs_vs_generic=5.6066262743570405e-15 correct=2712 class_mismatch_vs_generic=0 plan_calls=0
+rss_kb=19448

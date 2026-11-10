@@ -1,0 +1,3 @@
+ndk_clang=Android (13691557, +pgo, +bolt, +lto, +mlgo, based on r522817d) clang version 18.0.4 (https://android.googlesource.com/toolchain/llvm-project d8003a456d14a3deb8054cdaa529ffbf02d9b262)
+elf=ELF64 AArch64 DYN NEEDED libm.so libdl.so libc.so
+631034753883e3a8bc894f134ad855569bb2e9c188099da9313d955ed8634e0c  research/nl_mobile_opt_001/NL_MOBILE_OPT_001_A52_TERMUX.tar.gz

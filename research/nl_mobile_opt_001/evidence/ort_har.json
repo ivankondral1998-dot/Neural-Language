@@ -1,0 +1,21 @@
+{
+  "fp32_ort_accuracy": 0.9202578893790295,
+  "fp32_ort_correct": 2712,
+  "fp64_reference_accuracy": 0.9202578893790295,
+  "fp64_reference_loop_correct": 2712,
+  "max_abs_fp32_vs_explicit_fp64_loop": 2.395532369081632e-06,
+  "note": "FP32 Gemm is not the FP64 row-order contract",
+  "numeric": "fp32",
+  "onnx_version": "1.23.2",
+  "onnxruntime_version": "1.23.2",
+  "p50_us": 7.609000022057444,
+  "p95_us": 8.806999858279596,
+  "process_ru_maxrss_kb": 118048,
+  "provider": [
+    "CPUExecutionProvider"
+  ],
+  "rows": 2947,
+  "runtime": "onnxruntime",
+  "saved_mode_ignored": 1,
+  "threads": 1
+}

@@ -1,0 +1,11 @@
+task=cartpole rows=1024
+MODEL_LOADED cartpole_pretrained.nlw version=1
+MODEL_LOADED cartpole_pretrained.nlw version=1
+MODEL_LOADED cartpole_pretrained.nlw version=1
+MODEL_LOADED cartpole_pretrained.nlw version=1
+impl=nl_generic_observe_infer p50_us=5.2939999999999996 p95_us=5.7409999999999997 allocs_per_sample=1 max_abs_vs_generic=0 correct=1024 class_mismatch_vs_generic=0 plan_calls=0
+impl=nl_mobile_observe_infer p50_us=4.0609999999999999 p95_us=4.4420000000000002 allocs_per_sample=1 max_abs_vs_generic=0 correct=1024 class_mismatch_vs_generic=0 plan_calls=8192
+impl=cpp_scalar_kernel p50_us=4.4969999999999999 p95_us=4.9880000000000004 allocs_per_sample=0 max_abs_vs_generic=0 correct=1024 class_mismatch_vs_generic=0 plan_calls=0
+impl=cpp_ilp_kernel p50_us=3.2639999999999998 p95_us=3.6459999999999999 allocs_per_sample=0 max_abs_vs_generic=0 correct=1024 class_mismatch_vs_generic=0 plan_calls=0
+impl=openblas_dgemv_kernel p50_us=2.5070000000000001 p95_us=2.8180000000000001 allocs_per_sample=0 max_abs_vs_generic=7.9936057773011271e-15 correct=1024 class_mismatch_vs_generic=0 plan_calls=0
+rss_kb=6324

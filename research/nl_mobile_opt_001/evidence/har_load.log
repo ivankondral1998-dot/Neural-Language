@@ -1,0 +1,11 @@
+task=har rows=2947
+MODEL_LOADED har_model.nlw version=1
+MODEL_LOADED har_model.nlw version=1
+MODEL_LOADED har_model.nlw version=1
+MODEL_LOADED har_model.nlw version=1
+MODEL_LOADED har_model.nlw version=1
+MODEL_LOADED har_model.nlw version=1
+MODEL_LOADED har_model.nlw version=1
+MODEL_LOADED har_model.nlw version=1
+load_model_median_us=2850.799
+rss_kb=16804

@@ -1,0 +1,9 @@
+{
+  "language":"Neural Language 0.2",
+  "model":"CartPolePretrained",
+  "version":1,
+  "weights":4480,
+  "mode":"AUTO",
+  "counts":{"full":1,"delta":0,"train":0,"changes":0,"auto_full":0,"auto_delta":0,"blas_layers":0,"input_events":0,"input_delta":0,"input_auto_full":0,"mobile_plan":1},
+  "events":[]
+}

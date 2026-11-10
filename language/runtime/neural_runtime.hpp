@@ -98,7 +98,7 @@ inline double scalar_preactivation(const Layer& layer, const std::vector<double>
     finite(total,"forward activation");
     return total;
 }
-struct Counters {size_t full=0,delta=0,train=0,events=0,auto_full=0,auto_delta=0,blas_layers=0;size_t input_events=0,input_delta=0,input_auto_full=0;};
+struct Counters {size_t full=0,delta=0,train=0,events=0,auto_full=0,auto_delta=0,blas_layers=0;size_t input_events=0,input_delta=0,input_auto_full=0;size_t mobile_plan=0;};
 struct Snapshot {std::vector<Layer> layers;uint64_t version;std::vector<double> input;bool has_input,graph;};
 class Model {
 public:
@@ -119,6 +119,10 @@ public:
   size_t delta_streak=0;
   bool graph=false;  // topologically ordered, explicit layer parents
   enum Mode {AUTO=0,FULL=1,DELTA=2};Mode mode=AUTO;
+  // Set only by a compiler-emitted mobile-cpu plan. The callback writes z/a
+  // and must not call forward(). Ignored unless the binary is compiled with
+  // -DNEURAL_MOBILE_PLAN, so the generic profile keeps the previous hot path.
+  bool (*mobile_forward)(Model&) = nullptr;
   std::vector<std::string> events;
   explicit Model(std::string n,int ni):name(std::move(n)),ninput(ni) {require(ni>0&&ni<=2048,"input dimension out of range");}
   void layer(std::string nm,int out,int type,uint32_t seed,int storage=0) {
@@ -273,6 +277,16 @@ public:
   // A BLAS matrix-vector multiply is used only when every edge is enabled.
   void forward() {
     require(has_input,"observe an input before inference");
+#if defined(NEURAL_MOBILE_PLAN)
+    // Drop the cache before the plan runs so a throw cannot publish a partial result.
+    cache=false;cache_canonical=false;
+    if(mobile_forward && mobile_forward(*this)){
+      cache=true;cache_canonical=true;cache_version=version;
+      pending.clear();pending_input.clear();pending_layer=-1;delta_streak=0;
+      counters.full++;counters.mobile_plan++;
+      return;
+    }
+#endif
     // A failed computation must not leave a valid cache with partially written activations.
     cache=false;cache_canonical=false;
     for(size_t k=0;k<layers.size();k++) {
@@ -898,7 +912,7 @@ public:
     t.has_input=has_input;t.cache=cache;t.cache_canonical=cache_canonical;
     t.version=version;t.cache_version=cache_version;
     t.pending=pending;t.pending_input=pending_input;t.pending_layer=pending_layer;t.delta_streak=delta_streak;
-    t.mode=mode;t.graph=graph;t.strict_numeric=strict_numeric;
+    t.mode=mode;t.graph=graph;t.strict_numeric=strict_numeric;t.mobile_forward=mobile_forward;
     return t;
   }
   // Differential self-check invoked by `.nir` VERIFY. Work happens only on
@@ -1062,7 +1076,11 @@ public:
     std::ofstream f(destination,std::ios::out);require(bool(f),"cannot create report");
     f<<"{\n  \"language\":\"Neural Language 0.2\",\n  \"model\":\""<<escape(name)<<"\",\n  \"version\":"<<version<<",\n  \"weights\":"<<weight_count()<<",\n";
     f<<"  \"mode\":\""<<(mode==AUTO?"AUTO":(mode==FULL?"FULL":"DELTA"))<<"\",\n";
-    f<<"  \"counts\":{\"full\":"<<counters.full<<",\"delta\":"<<counters.delta<<",\"train\":"<<counters.train<<",\"changes\":"<<counters.events<<",\"auto_full\":"<<counters.auto_full<<",\"auto_delta\":"<<counters.auto_delta<<",\"blas_layers\":"<<counters.blas_layers<<",\"input_events\":"<<counters.input_events<<",\"input_delta\":"<<counters.input_delta<<",\"input_auto_full\":"<<counters.input_auto_full<<"},\n";
+    f<<"  \"counts\":{\"full\":"<<counters.full<<",\"delta\":"<<counters.delta<<",\"train\":"<<counters.train<<",\"changes\":"<<counters.events<<",\"auto_full\":"<<counters.auto_full<<",\"auto_delta\":"<<counters.auto_delta<<",\"blas_layers\":"<<counters.blas_layers<<",\"input_events\":"<<counters.input_events<<",\"input_delta\":"<<counters.input_delta<<",\"input_auto_full\":"<<counters.input_auto_full
+#if defined(NEURAL_MOBILE_PLAN)
+      <<",\"mobile_plan\":"<<counters.mobile_plan
+#endif
+      <<"},\n";
     f<<"  \"events\":[";for(size_t i=0;i<events.size();i++)f<<(i?",":"")<<"\""<<escape(events[i])<<"\"";f<<"]\n}\n";
     require(bool(f),"report write failed");std::cout<<"REPORT "<<destination<<"\n";
   }

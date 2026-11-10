@@ -1,0 +1,45 @@
+NL-MOBILE-OPT-001 protocol. Fixed before the acceptance measurements.
+Host only. Samsung A52 is not in this protocol and cannot be marked PASS from these runs.
+
+Thresholds, not to be edited after the runs:
+- Speed gate versus current Neural Language on the same host, model and inputs:
+  median per-sample latency speedup >= 1.25x
+  OR peak RSS reduction >= 30 percent with latency not worse than +10 percent.
+- The latency used for that gate is observe + infer(false), not file printing.
+- p50 index = n/2. p95 index = (n-1)*95/100. Same indexes as research/nl_train_001/bench.cpp.
+- Seven measured passes after one warmup pass. Implementations alternate inside each pass.
+- Reported p50 is the median of the seven pass p50 values (sorted, index 3).
+- Reported p95 is the median of the seven pass p95 values.
+- FP64 mobile-cpu versus generic FULL: max absolute logit difference must be 0.
+  Signed zero is not required. A non-zero difference fails the numeric contract.
+- UCI HAR quality gate versus the historical 92.03 percent (2712/2947):
+  a drop of more than 0.5 percentage points is not a successful quality result.
+  This profile is FP64 and is expected to match generic class counts exactly.
+- CartPole actions: argmax, lower index wins ties. All actions on the fixed set must match.
+- FP32 ONNX Runtime and OpenBLAS dgemv are different numeric reductions.
+  They are not the FP64 contract. Quality is comparable only if HAR accuracy
+  is within 0.5 percentage points of the FP64 generic accuracy measured here.
+- Do not treat a smaller weight file as a peak-RSS reduction.
+- Energy is recorded only if /sys/class/powercap or another counter exists.
+  Absence is NOT_MEASURED, not zero.
+
+Workloads:
+- HAR: research/nl_train_001/models/har_model.nlw, prepared UCI test features
+  and labels. 2947 rows, 561 inputs, 16 tanh, 6 linear. tune full is the
+  language program; the bench sets Mode::FULL.
+- CartPole: research/agent_pilot/models/cartpole_pretrained.nlw.
+  1024 states. Generator: uint32 state = 20261110; state = state * 1664525 + 1013904223;
+  each coordinate is ((state >> 8) % 1000000) / 1000000.0 - 0.5, four coordinates.
+
+Independent C++:
+- cpp_scalar: one accumulator per row, left to right. This is the strong-enough
+  scalar reference, not a loop of virtual calls.
+- cpp_ilp4: a separately written 4-row loop, not a call into mobile_dense_ilp4.
+- openblas: scipy OpenBLAS dgemv on both layers, then the same activation.
+  OPENBLAS_NUM_THREADS=1.
+- onnxruntime: FP32, one intra-op thread, one inter-op thread. Separate log.
+
+RSS: one process per implementation, getrusage ru_maxrss after the workload.
+Allocations: operator new counter around one timed pass, divided by sample count.
+Load time: seven load_model calls on fresh models, median.
+Binary size: stat of the compiled .nir programs, not of the bench.

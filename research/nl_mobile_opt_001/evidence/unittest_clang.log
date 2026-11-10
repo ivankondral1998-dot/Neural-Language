@@ -1,0 +1,121 @@
+test_bad_graphs_fail_before_compilation (test_dag_changes.DAGShapeAndChanges) ... ok
+test_checkpoint_reload_and_topology_guard (test_dag_changes.DAGShapeAndChanges) ... ok
+test_codegen_rejects_dag_operations_even_with_recomputed_effects (test_dag_changes.DAGShapeAndChanges) ... ok
+test_codegen_reports_malformed_ir_as_compile_error (test_dag_changes.DAGShapeAndChanges) ... ok
+test_graph_shapes_and_edges (test_dag_changes.DAGShapeAndChanges) ... ok
+test_invalid_graph_benchmark_commands_do_not_run (test_dag_changes.DAGShapeAndChanges) ... ok
+test_mutated_ir_fails_controlled (test_dag_changes.DAGShapeAndChanges) ... ok
+test_native_graph_execution_and_checkpoints (test_dag_changes.DAGShapeAndChanges) ... ok
+test_native_independent_dag_oracle_stress (test_dag_changes.DAGShapeAndChanges) ... ok
+test_sequential_explicit_parent_remains_legacy (test_dag_changes.DAGShapeAndChanges) ... ok
+test_snapshot_and_effect_lifetimes (test_dag_changes.DAGShapeAndChanges) ... ok
+test_bad_source_and_mutated_ir (test_dataset_training.DatasetTrainingTests) ... ok
+test_ir_typed_effects_and_budget (test_dataset_training.DatasetTrainingTests) ... ok
+test_native_train_repeat_load_and_bad_data (test_dataset_training.DatasetTrainingTests) ... ok
+test_duplicate_and_loop_checkpoints_rejected (test_effects_changes_integration.EffectContractTests) ... ok
+test_effect_metadata_checked_prior_to_native_emit (test_effects_changes_integration.EffectContractTests) ... ok
+test_no_cpp_codegen_change_for_previous_valid_program (test_effects_changes_integration.EffectContractTests) ... ok
+test_restored_snapshot_native_matches_full_oracle (test_effects_changes_integration.EffectContractTests) ... ok
+test_restoring_input_snapshot_enables_delta (test_effects_changes_integration.EffectContractTests) ... ok
+test_restoring_unbound_snapshot_rejects_delta (test_effects_changes_integration.EffectContractTests) ... ok
+test_rewinding_missing_checkpoint_rejected (test_effects_changes_integration.EffectContractTests) ... ok
+test_second_iteration_after_restore_unbound_snapshot_rejected (test_effects_changes_integration.EffectContractTests) ... ok
+test_second_iteration_with_bound_snapshot_accepted (test_effects_changes_integration.EffectContractTests) ... ok
+test_dangling_symlink_report_not_followed (test_hardening.HardeningTests) ... ok
+test_expect_nan_rejected_in_runtime (test_hardening.HardeningTests) ... ok
+test_invalid_unicode_escape_is_compile_error (test_hardening.HardeningTests) ... ok
+test_report_bidi_rejected (test_hardening.HardeningTests) ... ok
+test_report_newline_rejected (test_hardening.HardeningTests) ... ok
+test_report_safe_unicode (test_hardening.HardeningTests) ... ok
+test_report_utf8_byte_limit (test_hardening.HardeningTests) ... ok
+test_very_large_integer_is_compile_error (test_hardening.HardeningTests) ... ok
+test_bad_optimize_range_rejected (test_integration.IntegratedSyntax) ... ok
+test_bad_validation_input_rejected (test_integration.IntegratedSyntax) ... ok
+test_bad_validation_target_rejected (test_integration.IntegratedSyntax) ... ok
+test_negative_tolerance_rejected (test_integration.IntegratedSyntax) ... ok
+test_ops_present_in_ir_and_native_cpp (test_integration.IntegratedSyntax) ... ok
+test_evaluation_not_training (test_integration.IntegrationRuntime) ... ok
+test_failed_validation_stops_pipeline (test_integration.IntegrationRuntime) ... ok
+test_integrated_native_clang (test_integration.IntegrationRuntime) ... ok
+test_integrated_native_gcc (test_integration.IntegrationRuntime) ... ok
+test_optimizer_does_not_change_weights (test_integration.IntegrationRuntime) ... ok
+test_compiler_rejects_model_traversal (test_integration.PersistentWeightsTests) ... ok
+test_missing_and_truncated_model_rejected (test_integration.PersistentWeightsTests) ... ok
+test_roundtrip_two_native_executables (test_integration.PersistentWeightsTests) ... ok
+test_save_and_load_masks_biases_int8 (test_integration.PersistentWeightsTests) ... ok
+test_bad_index_rejected (test_language.CompilerTests) ... ok
+test_bounded_resources (test_language.CompilerTests) ... ok
+test_cpp_not_scripting_layer (test_language.CompilerTests) ... ok
+test_duplicate_layer_rejected (test_language.CompilerTests) ... ok
+test_enormous_loop_rejected (test_language.CompilerTests) ... ok
+test_learning_rate_rejected (test_language.CompilerTests) ... ok
+test_no_python_expression_in_vectors (test_language.CompilerTests) ... ok
+test_parse_minimal (test_language.CompilerTests) ... ok
+test_path_traversal_rejected (test_language.CompilerTests) ... ok
+test_shape_rejected_at_compile (test_language.CompilerTests) ... ok
+test_target_shape_rejected (test_language.CompilerTests) ... ok
+test_unclosed_cycle_rejected (test_language.CompilerTests) ... ok
+test_unknown_instruction_rejected (test_language.CompilerTests) ... ok
+test_unknown_weight_rejected (test_language.CompilerTests) ... ok
+test_expect_checks_result (test_language.NativeTests) ... ok
+test_failure_does_not_change_original_source (test_language.NativeTests) ... ok
+test_native_advisor_does_not_mutate_model (test_language.NativeTests) ... ok
+test_real_learning_and_output (test_language.NativeTests) ... ok
+test_relu_crossing_and_snapshot (test_language.NativeTests) ... ok
+test_sparse_vs_full_three_layer (test_language.NativeTests) ... ok
+test_checkpoint_duplicate_rejected (test_language.PreservationTests) ... ok
+test_repeated_run_keeps_first_report (test_language.PreservationTests) ... ok
+test_generic_emit_has_no_plan (test_mobile_plan.PlanIr) ... ok
+test_int8_and_graph_rejected (test_mobile_plan.PlanIr) ... ok
+test_mobile_plan_records_shapes_and_contract (test_mobile_plan.PlanIr) ... ok
+test_predict_matches_generic_and_plan_runs (test_mobile_plan.PlanNative) ... ok
+test_training_weights_match_generic (test_mobile_plan.PlanNative) ... ok
+test_cycle_accepted_after_observation (test_observe_delta.CompilerDelta) ... ok
+test_ir_contract_and_output (test_observe_delta.CompilerDelta) ... ok
+test_legacy_cpp_identical_to_frozen_golden (test_observe_delta.CompilerDelta) ... ok
+test_static_invalid_programs (test_observe_delta.CompilerDelta) ... ok
+test_tampered_neural_ir_rejected_before_codegen (test_observe_delta.CompilerDelta) ... ok
+test_gcc_and_clang_compiled_programs_equivalent (test_observe_delta.NativeDelta) ... ok
+test_gcc_clang_randomized_oracle_stress (test_observe_delta.NativeDelta) ... ok
+test_existing_nir_syntax_and_native_report (test_observe_reuse.AutomaticObserveReuse) ... ok
+test_independent_stress_both_compilers (test_observe_reuse.AutomaticObserveReuse) ... ok
+test_no_new_grammar_and_existing_ir (test_observe_reuse.AutomaticObserveReuse) ... ok
+test_budget_explicit_forward_macs (test_quantization_fixes.FixedCompilerTests) ... ok
+test_budget_includes_gate_and_cache (test_quantization_fixes.FixedCompilerTests) ... ok
+test_byte_counts_and_ir_types (test_quantization_fixes.FixedCompilerTests) ... ok
+test_float_only_unaffected (test_quantization_fixes.FixedCompilerTests) ... ok
+test_cpp_int8_no_shadow_numerical_and_checkpoint (test_quantization_fixes.NativeInt8Tests) ... ok
+test_canonical_full_delta_trajectory (test_semantic_safety.AuditSemanticSafety)
+720 ticks x 4 topologies, checking every activation and preactivation. ... ok
+test_compiled_nir_cancellation (test_semantic_safety.AuditSemanticSafety)
+The actual .nir surface must not print 0 for a canonical value 5. ... ok
+test_compiled_nir_subtle_cancellation (test_semantic_safety.AuditSemanticSafety)
+The default incremental path must reject a >2-unit rounding error. ... ok
+test_cpp_runtime_counterexamples (test_semantic_safety.AuditSemanticSafety)
+Covers sequence/DAG AUTO+DELTA, mode, mixed orders, and sequential/DAG SGD. ... ok
+test_compiled_nir_below_heuristic_cutoff (test_semantic_safety.StrictNumericContract) ... ok
+test_compiled_nir_blas_backend_transition (test_semantic_safety.StrictNumericContract) ... ok
+test_compiled_nir_hidden_cancellation (test_semantic_safety.StrictNumericContract) ... ok
+test_combined_metadata_is_consistent (test_shapes_changes_integration.ShapesEffectsChanges) ... ok
+test_delta_and_weight_operand_mutations (test_shapes_changes_integration.ShapesEffectsChanges) ... ok
+test_filename_guards (test_shapes_changes_integration.ShapesEffectsChanges) ... ok
+test_frozen_cpp_golden (test_shapes_changes_integration.ShapesEffectsChanges) ... ok
+test_input_shapes_and_numeric_value_types (test_shapes_changes_integration.ShapesEffectsChanges) ... ok
+test_json_roundtrip_and_legacy_ir_without_shapes (test_shapes_changes_integration.ShapesEffectsChanges) ... ok
+test_malformed_checkpoint_label_is_compile_error_not_python_error (test_shapes_changes_integration.ShapesEffectsChanges) ... ok
+test_metadata_tamper (test_shapes_changes_integration.ShapesEffectsChanges) ... ok
+test_mutated_brain_fields (test_shapes_changes_integration.ShapesEffectsChanges) ... ok
+test_mutated_layers (test_shapes_changes_integration.ShapesEffectsChanges) ... ok
+test_mutated_operation_lifetime_and_count (test_shapes_changes_integration.ShapesEffectsChanges) ... ok
+test_randomized_dense_shape_oracle (test_shapes_changes_integration.ShapesEffectsChanges) ... ok
+test_mutation_detects_old_int8_rounding_defect (test_verifier.VerifierTests) ... ok
+test_nir_executes_and_preserves_outputs (test_verifier.VerifierTests) ... ok
+test_parser_and_ir (test_verifier.VerifierTests) ... ok
+test_reject_invalid_verify_limits (test_verifier.VerifierTests) ... ok
+test_release_build_rejects_nan_and_infinity (test_verifier.VerifierTests) ... ok
+
+----------------------------------------------------------------------
+Ran 111 tests in 176.655s
+
+OK
+EXIT:0

@@ -1,0 +1,13 @@
+# Sequential dense FP64 policy. The mobile-cpu plan is selected by the compiler,
+# not by a CartPole-specific kernel in the runtime.
+brain CartPolePretrained {
+  senses 4
+  neurons hidden1 64 tanh
+  neurons hidden2 64 tanh
+  neurons actions 2 linear
+  init 42
+}
+load_model "cartpole_pretrained.nlw"
+observe [0.02, -0.01, 0.04, -0.03]
+predict
+report "cartpole_report.json"

@@ -1,0 +1,7 @@
+task=har rows=2947
+MODEL_LOADED har_model.nlw version=1
+MODEL_LOADED har_model.nlw version=1
+MODEL_LOADED har_model.nlw version=1
+MODEL_LOADED har_model.nlw version=1
+impl=nl_mobile_observe_infer p50_us=4.9349999999999996 p95_us=5.1299999999999999 allocs_per_sample=1 max_abs_vs_generic=0 correct=2712 class_mismatch_vs_generic=0 plan_calls=23576
+rss_kb=17120

@@ -1,0 +1,6 @@
+date=2026-11-10T12:44:52Z
+uname=Linux hds-5qbyrr2dwxa8 6.12.8+ #1 SMP Tue Jul 21 13:56:45 UTC 2026 x86_64 GNU/Linux
+g++=g++ (Debian 12.2.0-14+deb12u1) 12.2.0
+cpu=Intel(R) Xeon(R) Platinum 8481C CPU @ 2.70GHz
+powercap=ABSENT energy=NOT_MEASURED
+protocol_sha=57fb4303c298204340dac18903f7c0f1de445b6926bd621dcab65fff818aff37

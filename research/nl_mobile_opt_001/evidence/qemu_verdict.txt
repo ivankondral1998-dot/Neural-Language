@@ -1,0 +1,7 @@
+qemu_user=7.2.0 static
+binary=Android static Bionic, aarch64-linux-android26, -O2 -ffp-contract=off
+rows=2947
+DATA_PREDICT_identical=True
+not_a_device_pass=true
+not_a_speed_measurement=true
+report_name_differs_because_second_process_saw_existing_har_report_json=true

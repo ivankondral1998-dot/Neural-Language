@@ -1,0 +1,19 @@
+{
+  "runtime": "onnxruntime",
+  "numeric": "fp32",
+  "batch": 2947,
+  "threads": 1,
+  "p50_us_per_row_of_batch_passes": 0.3051472684090153,
+  "seven_us_per_row": [
+    0.28413810652546306,
+    0.29118086192096004,
+    0.29143637592415933,
+    0.3051472684090153,
+    0.3090587037567067,
+    0.31936308105851796,
+    0.3934899898993268
+  ],
+  "correct": 2712,
+  "accuracy": 0.9202578893790295,
+  "note": "One Gemm call for all 2947 rows. Not comparable to the per-call Python loop and not the FP64 contract."
+}
