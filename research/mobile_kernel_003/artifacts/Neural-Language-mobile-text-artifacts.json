@@ -1,0 +1,14 @@
+{
+  "commit": "e794a16b0aa5b3ea07fae704097cb904b9469541",
+  "branch": "research/mobile-text-kernels-20261110",
+  "artifacts": {
+    "Neural-Language-mobile-text-changes.zip": {
+      "bytes": 61663,
+      "sha256": "af8e91cb1bce6eda99cc2ddc6bb78acaab0ad9f2d209e4968bdc7f7d3055834e"
+    },
+    "neural-mobile-kernel-003-ready.tar.gz": {
+      "bytes": 5792645,
+      "sha256": "3489efe9d1798e8dd4c7b89e3c3ece465521ec2527b8fc06feb54cb165c48e4b"
+    }
+  }
+}

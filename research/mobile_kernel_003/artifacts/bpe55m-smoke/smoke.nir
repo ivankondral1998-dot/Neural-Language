@@ -1,0 +1,13 @@
+# OPTIONAL isolated PyTorch profile; not accepted by the native .nir compiler.
+# Actual tokenizer vocabulary (260..4096) determines the tied embedding size.
+brain DialogueBPE {
+  tokens bpe4096
+  context 1024
+  width 768
+  heads 12
+  blocks 10
+  feedforward 1824
+  seed 42
+}
+train_dialogue "smoke.jsonl" steps 1 rate 0.0001
+save_model "new_random_bpe_smoke.pt"

@@ -1,0 +1,50 @@
+{
+  "scope": "Saved previously local experiment artifacts; no rebuild/retraining; no caches, credentials, persona or toolchain packages",
+  "source_code_commit": "e794a16b0aa5b3ea07fae704097cb904b9469541",
+  "files": {
+    "Neural-Language-mobile-text-artifacts.json": {
+      "bytes": 455,
+      "sha256": "1ba8c40c76d75e22e1504b071626fda5ddd4c80c45075fc6cfbc0a21f1454cf3"
+    },
+    "Neural-Language-mobile-text-changes.patch": {
+      "bytes": 273398,
+      "sha256": "e1091efcde495bb7b79469c09f297bd48a0006b6479fa2cb6c69b2d2f61c26b0"
+    },
+    "Neural-Language-mobile-text-changes.zip": {
+      "bytes": 61663,
+      "sha256": "af8e91cb1bce6eda99cc2ddc6bb78acaab0ad9f2d209e4968bdc7f7d3055834e"
+    },
+    "bpe55m-smoke/README.txt": {
+      "bytes": 920,
+      "sha256": "697fd979e4c4f0e40ee861fcbdb5e87a8fef3c6edd9b5975c10667f7c787edcc"
+    },
+    "bpe55m-smoke/new_random_bpe_smoke.pt": {
+      "bytes": 667856861,
+      "sha256": "dfc3ceae6d371338ecf818a40336aca9b4bb554f7730179a51dcbb6efc0a67b7"
+    },
+    "bpe55m-smoke/smoke.jsonl": {
+      "bytes": 135,
+      "sha256": "b6610eea0a9ed21a7cc60b91d46610fafcd23bc6703f1d06b5c3341cf85565a0"
+    },
+    "bpe55m-smoke/smoke.nir": {
+      "bytes": 361,
+      "sha256": "9eb426f7a6b8fcca2f9c8e73b3cd17a479016829f074181232a7ec2696bf32dd"
+    },
+    "bpe55m-smoke/synthetic-codepoint-sequences.txt": {
+      "bytes": 1560000,
+      "sha256": "659f1a253a46ac7a7bd68d68ecddbdd07ee064f0cc78b65d5d667179f5cedb75"
+    },
+    "bpe55m-smoke/tokenizer.json": {
+      "bytes": 142142,
+      "sha256": "a498086df0bb327dd2ec04340455145e6e3cc4a548d78c60122ba1925d067bb5"
+    },
+    "neural-mobile-kernel-003-ready.tar.gz": {
+      "bytes": 5792645,
+      "sha256": "3489efe9d1798e8dd4c7b89e3c3ece465521ec2527b8fc06feb54cb165c48e4b"
+    },
+    "neural-mobile-kernel-003-ready.tar.gz.sha256": {
+      "bytes": 104,
+      "sha256": "74b2542bd6d5d1288c37500f47d2c30b4514e319010e733c0b45b060018e1e1e"
+    }
+  }
+}

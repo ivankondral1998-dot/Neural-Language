@@ -1,0 +1,4 @@
+research/mobile_kernel_003/artifacts/bpe55m-smoke/new_random_bpe_smoke.pt filter=lfs diff=lfs merge=lfs -text
+
+# Preserve significant context spaces in the archived patch.
+research/mobile_kernel_003/artifacts/Neural-Language-mobile-text-changes.patch -whitespace
