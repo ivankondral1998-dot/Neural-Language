@@ -254,7 +254,9 @@ std::vector<Summary> run_suite(const Task& task, const std::vector<Kind>& kinds)
             const auto& out = generic.infer(false);
             std::copy(out.begin(), out.end(), y.begin());
         } else if (kind == Kind::Mobile) {
-            mobile.observe(row.features);
+            // The mobile-cpu profile declares FULL inference. Borrow the input
+            // row to avoid a heap allocation from observe(by-value).
+            mobile.observe_full_reuse(row.features);
             const auto& out = mobile.infer(false);
             std::copy(out.begin(), out.end(), y.begin());
         } else {
