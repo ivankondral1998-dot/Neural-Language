@@ -1,0 +1,6 @@
+brain VectorRegression {
+  senses 2
+  neurons predictions 2 linear
+}
+load_model "regression.nlw"
+predict_data "features.txt" samples 4
