@@ -9,15 +9,19 @@ namespace neural {
 struct DatasetRow {
     std::vector<double> features;
     int label = 0;
+    std::vector<double> targets;
 };
 
 // The shape is supplied by checked IR, not inferred from the file. Reading
 // the complete dataset first keeps malformed input from triggering SGD.
 inline std::vector<DatasetRow> read_dataset(const std::string& path, int samples,
-                                            int width, int classes = 0) {
+                                            int width, int classes = 0, int target_width = 0) {
     Model::safe_model_filename(path);
-    require(width > 0 && width <= 2048 && samples > 0 && samples <= 100000 &&
-            static_cast<uint64_t>(samples) * width <= 8000000, "dataset shape exceeds limits");
+    require(width > 0 && width <= 2048 && target_width >= 0 && target_width <= 4096 &&
+            classes >= 0 && !(classes && target_width) &&
+            samples > 0 && samples <= 100000 &&
+            static_cast<uint64_t>(samples) * (width + target_width) <= 8000000,
+            "dataset shape exceeds limits");
     std::error_code ec;
     const auto status = std::filesystem::symlink_status(path, ec);
     require(!ec && std::filesystem::is_regular_file(status), "dataset must be a regular local file");
@@ -31,7 +35,8 @@ inline std::vector<DatasetRow> read_dataset(const std::string& path, int samples
     for (int row = 0; row < samples; ++row) {
         const auto location = "dataset row " + std::to_string(row + 1);
         require(bool(std::getline(stream, line)), location + ": missing");
-        require(line.size() <= static_cast<size_t>(width) * 64 + 32, location + ": too long");
+        require(line.size() <= static_cast<size_t>(width + target_width) * 64 + 32,
+                location + ": too long");
         std::istringstream values(line);
         values.imbue(std::locale::classic());
         DatasetRow sample;
@@ -51,6 +56,16 @@ inline std::vector<DatasetRow> read_dataset(const std::string& path, int samples
             if (!(values >> value) || !std::isfinite(value) || std::abs(value) >= 1.e9)
                 throw std::runtime_error(location + ": invalid or missing feature");
         }
+        sample.targets.resize(static_cast<size_t>(target_width));
+        for (size_t col = 0; col < sample.targets.size(); ++col) {
+            const int separator = values.peek();
+            if (separator == std::char_traits<char>::eof() ||
+                !std::isspace(static_cast<char>(separator), std::locale::classic()))
+                throw std::runtime_error(location + ": missing target separator");
+            double& value = sample.targets[col];
+            if (!(values >> value) || !std::isfinite(value) || std::abs(value) >= 1.e9)
+                throw std::runtime_error(location + ": invalid or missing target");
+        }
         values >> std::ws;
         require(values.eof(), location + ": extra field");
         rows.push_back(std::move(sample));
@@ -61,13 +76,15 @@ inline std::vector<DatasetRow> read_dataset(const std::string& path, int samples
 }
 
 inline void train_data(Model& model, const std::string& path, int samples, int epochs,
-                       double rate, uint32_t seed) {
-    require(!model.layers.empty() && model.layers.back().out >= 2, "dataset needs two or more classes");
+                       double rate, uint32_t seed, bool vector_targets = false) {
+    require(!model.layers.empty() && (vector_targets || model.layers.back().out >= 2),
+            "classification dataset needs two or more classes");
     require(samples > 0 && epochs > 0 && epochs <= 1000 &&
             static_cast<uint64_t>(samples) * epochs <= 1000000, "dataset training exceeds step limit");
     require(rate > 0 && rate <= 1, "dataset learning rate must be (0,1]");
     const int classes = model.layers.back().out;
-    const auto rows = read_dataset(path, samples, model.ninput, classes);
+    const auto rows = read_dataset(path, samples, model.ninput,
+                                   vector_targets ? 0 : classes, vector_targets ? classes : 0);
     std::vector<int> order(rows.size());
     std::vector<double> target(static_cast<size_t>(classes), 0.);
     std::mt19937 random(seed);
@@ -81,9 +98,13 @@ inline void train_data(Model& model, const std::string& path, int samples, int e
         for (int index : order) {
             const auto& row = rows[static_cast<size_t>(index)];
             model.observe(row.features);
-            target[static_cast<size_t>(row.label)] = 1.;
-            model.learn(target, rate);
-            target[static_cast<size_t>(row.label)] = 0.;
+            if (vector_targets) {
+                model.learn(row.targets, rate);
+            } else {
+                target[static_cast<size_t>(row.label)] = 1.;
+                model.learn(target, rate);
+                target[static_cast<size_t>(row.label)] = 0.;
+            }
         }
     }
     std::cout << "DATA_TRAIN samples=" << samples << " epochs=" << epochs
