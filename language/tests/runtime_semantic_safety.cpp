@@ -122,6 +122,34 @@ static void check_sgd_transaction() {
   m.forward();
   near(m.infer(false)[0],0.,"canonical forward after failed SGD");
 }
+static void check_dag_sgd_transaction() {
+  neural::Model m("TransactionalDAG",2);
+  m.layer_sources("left",1,0,11,0,{"input"});
+  m.layer_sources("right",1,0,12,0,{"input"});
+  m.layer_sources("out",1,0,13,0,{"left","right"});
+  for(auto& layer:m.layers){
+    std::fill(layer.w.begin(),layer.w.end(),0.);
+    std::fill(layer.b.begin(),layer.b.end(),0.);
+  }
+  m.layers.back().w[0]=1.; // propagate output loss into left branch
+  m.observe({1.,600000000.});
+  near(m.infer(false)[0],0.,"DAG SGD initial");
+  std::vector<std::vector<double>> w_before,b_before;
+  for(const auto& layer:m.layers){w_before.push_back(layer.w);b_before.push_back(layer.b);}
+  const auto version=m.version, trained=m.counters.train;
+  bool rejected=false;
+  try{m.learn({1.},1.);}catch(const std::exception&){rejected=true;}
+  require_test(rejected,"DAG SGD invalid update must be rejected");
+  require_test(m.version==version && m.counters.train==trained,
+               "failed DAG SGD committed version/counter");
+  for(size_t k=0;k<m.layers.size();k++){
+    require_test(m.layers[k].w==w_before[k] && m.layers[k].b==b_before[k],
+                 "failed DAG SGD partially wrote layer "+std::to_string(k));
+  }
+  near(m.infer(false)[0],0.,"DAG cache after failed SGD");
+  m.forward();
+  near(m.infer(false)[0],0.,"DAG canonical forward after failed SGD");
+}
 int main() {
   int failures=0;
   auto run = [&](const char* name, const std::function<void()>& test) {
@@ -139,7 +167,8 @@ int main() {
   run("mixed_weight_then_input", check_mixed_weight_then_input);
   run("mixed_input_then_weight", check_mixed_input_then_weight);
   run("sgd_transaction_rollback", check_sgd_transaction);
+  run("dag_sgd_transaction_rollback", check_dag_sgd_transaction);
   std::cout << "SEMANTIC_SAFETY " << (failures?"FAIL":"PASS") <<
-               " cases=8 failed=" << failures << "\n";
+               " cases=9 failed=" << failures << "\n";
   return failures ? 1 : 0;
 }
