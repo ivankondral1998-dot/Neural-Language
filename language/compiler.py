@@ -887,7 +887,11 @@ def emit(ir):
             elif o=='train_data':
                 lines.append(f'neural::train_data(brain,{string(x["filename"])},{x["samples"]},{x["epochs"]},{number(x["rate"])},{x["seed"]}u);')
             elif o=='predict_data':
-                lines.append(f'neural::predict_data(brain,{string(x["filename"])},{x["samples"]});')
+                # Generic emission stays byte-for-byte compatible. The mobile
+                # profile can reuse the bound input buffer in FULL mode; AUTO
+                # and DELTA retain their existing observe semantics.
+                reuse=',true' if plan is not None else ''
+                lines.append(f'neural::predict_data(brain,{string(x["filename"])},{x["samples"]}{reuse});')
             elif o=='learn':lines.append(f'brain.learn({vec(x["values"])},{number(x["rate"])});')
             elif o=='tune':lines.append('brain.mode=neural::Model::'+{'auto':'AUTO','full':'FULL','incremental':'DELTA'}[x['mode']]+';')
             elif o=='weight':lines.append(f'brain.change({string(x["layer"])},{x["row"]},{x["col"]},{number(x["delta"])});')
