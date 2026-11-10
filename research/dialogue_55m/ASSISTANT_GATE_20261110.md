@@ -1,17 +1,33 @@
-# Assistant-based dialogue 55M gate — 2026-11-10
+# NL-55M: использование помощника и отбор весов (10 ноября 2026)
 
-The exact original Neural Language Assistant 0.5 source, examples, reference oracle and tests were imported from feature/verified-assistant-0.5-20261108 at fd8052ab8038147057dec0bd9bd11ed4419e71e5. They are not modified. The original assistant can propose a tiny two-branch ReLU DAG and accept/reject on held-out validation data; it CANNOT train or evaluate the 55M Transformer directly.
+## Контекст
 
-An isolated experimental dialogue assistant (source distributed as a separate archive until committed) adapted its evidence-gate, split-validation and no-overwrite rules to a 55,439,360-parameter PyTorch checkpoint. No native Neural Language claim is implied.
+Оригинальный `Neural Language Assistant 0.5` импортирован без изменения исходников из `feature/verified-assistant-0.5-20261108` (SHA `fd8052ab8038147057dec0bd9bd11ed4419e71e5`): `language/assistant.py`, `reference_eval.py`, примеры, тесты и документы. Оригинальный помощник улучшает только небольшой FP64 dense-граф, а не языковую модель на 55 млн весов. Его регрессионные тесты в текущем объединении не выполнялись.
 
-Local CPU experiments on 2026-11-10 from checkpoint SHA256 a25b34910ad82a9d4efb30e375d1cd8c846880e58302a81c6285636c4fdc402d:
+Для 55 млн добавлен **отдельный адаптер** `research/dialogue_55m/assistant_dialogue.py`. Он перенимает принцип 0.5: отдельные train/validation/test, строгий порог ACCEPT/REJECT, сохранение исходных весов, журналирование и проверка пересечений. Это не вызов оригинального помощника на Transformer и не промышленная интеграция с `.nir`.
 
-- Candidate A: two optimizer steps, lr=5e-5, 4 training pairs, 2 validation pairs; mean answer NLL 3.4696820873 to 3.5206516473 (-1.469%); REJECT_NO_VALIDATION_GAIN.
-- Candidate B: two steps from SAME checkpoint, lr=1e-5; NLL 3.4696820873 to 3.4180774541 (+1.487%); ACCEPT under the preset 1% relative gate. SHA256 ecc3d0bcd2370f733070cc1de5c1fd3728d3b1ef523640a80cb2e2c22d43d442; 221798795 bytes; checkpoint is not in GitHub due size.
-- Four small adapted policy unit tests PASS.
-- Both baseline and candidate still generate non-meaningful invalid UTF-8 for 'Привет!'. No useful conversation achieved.
-- Split: train 4 examples, validation 2, test 2. No prompt overlap. Not representative of real Russian dialogue.
-- The original Assistant 0.5 was source-imported only; its older native tests have NOT been rerun on the current experimental branch.
-- Original branch, main, UNO untouched. No GitHub Actions.
+## Доказательства локального CPU-испытания
 
-Next: integrate adapted assistant implementation into this branch; test with representative licensed dialogue corpus; evaluate against baseline and independent held-out examples. No inference speed or mobile validity claim.
+Исходный checkpoint: `a25b34910ad82a9d4efb30e375d1cd8c846880e58302a81c6285636c4fdc402d`, 55 439 360 параметров, 4 шага исходного обучения. Тестовый корпус: 4 train / 2 validation / 2 test коротких искусственных диалога. Проверка пересечений по нормализованным входным сообщениям пройдена.
+
+| Кандидат | Два шага AdamW | Валид. NLL до | Валид. NLL после | Решение |
+| --- | --- | ---: | ---: | --- |
+| A | lr 0.00005 | 3.469682 | 3.520652 | REJECT (-1.47%) |
+| B | lr 0.00001 | 3.469682 | 3.418077 | ACCEPT (+1.49%) |
+
+Условия: относительное улучшение NLL не меньше 1% и абсолютное больше 0.0001. Решение принято только по validation. Test не участвовал в отборе. В обоих вариантах новый оптимизатор создан с нуля — исходное состояние AdamW не сохранено.
+
+Файл принятого кандидата: SHA-256 `ecc3d0bcd2370f733070cc1de5c1fd3728d3b1ef523640a80cb2e2c22d43d442`, 221 798 795 байт. Из-за размера в GitHub не загружен, хранится как отдельный артефакт чата. Оригинал сохранён.
+
+**Важный отрицательный результат:** проверка генерации на русском `Привет!` в обоих вариантах дала нечитаемые символы. Улучшение NLL на двух контрольных строках не означает способности разговаривать. Перенос на телефон не проверялся. Это PyTorch-экспериментальный путь, а не существующий native-компилятор языка.
+
+## Воспроизведение (из папки research/dialogue_55m)
+
+```bash
+python -m unittest -v test_assistant_dialogue
+python assistant_dialogue.py --checkpoint /path/to/dialogue_55m.pt --train tiny_dialogue.jsonl --validation validation_dialogue.jsonl --test test_dialogue.jsonl --output /path/to/new-output --steps 2 --rate 0.00001 --minimum-gain 0.01
+```
+
+Выходной каталог не должен существовать, старые результаты не перезаписываются. Проверены локально: `py_compile`, 4/4 unit tests PASS, две попытки обновления, SHA-256 принятого checkpoint, загрузка и генерация. Не проверены: полный комплект регрессий оригинального Assistant 0.5 в этой ветке, независимый oracle FP64 для Transformer, обучение на репрезентативном разговорном корпусе, скорость и корректность на Android.
+
+Прежние ветки, `main` и репозиторий UNO не изменялись; GitHub Actions не запускались.
