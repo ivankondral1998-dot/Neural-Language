@@ -53,6 +53,15 @@ inline void finite(double v, const char* where) {
 inline std::string escape(const std::string& s) { std::string out; for (unsigned char c:s) {if(c=='"')out+="\\\"";else if(c=='\\')out+="\\\\";else if(c=='\n')out+="\\n";else if(c<32) {std::ostringstream o;o<<"\\u"<<std::hex<<std::setfill('0')<<std::setw(4)<<int(c);out+=o.str();}else out+=char(c);}return out;}
 inline double act(double z,int type) { if(type==1) return std::max(0.0,z); if(type==2) return z>=0?1.0/(1.0+std::exp(-z)):std::exp(z)/(1.0+std::exp(z)); if(type==3) return std::tanh(z); return z; }
 inline double derivative(double z,double a,int type) {if(type==1)return z>0?1.0:0.0;if(type==2)return a*(1-a);if(type==3)return 1-a*a;return 1.0;}
+// Partial sums can lose a small term when a huge cached preactivation cancels.
+// Force canonical FULL if an update changes a much larger term into a near-zero
+// value; this is a risk gate, NOT a general proof of all FP64 delta trajectories.
+inline bool delta_cancellation_risk(double before,double increment){
+  const double after=before+increment;
+  const double scale=std::max(std::abs(before),std::abs(increment));
+  return !std::isfinite(after) || std::abs(after)>=1.0e9 ||
+         (scale>0.0 && std::abs(after)<=scale*1.0e-8);
+}
 struct Layer {
   std::string name; int in=0,out=0,type=0,storage=0; std::vector<int> sources; std::vector<double> w,b;std::vector<int8_t> q; double scale=1.0/127.0;std::vector<uint8_t> enabled;size_t disabled=0;
   // Exactly one owning weight buffer: either q (one byte/weight) or w (eight bytes/weight).
@@ -295,6 +304,7 @@ public:
   void flush_pending() {
     if(pending.empty())return;
     if(!choose_delta()){if(mode==AUTO)counters.auto_full++;forward();return;}
+    cache=false; // Any failed partial update must invalidate the cached activations.
     int l=pending_layer;
     auto& L=layers[l];
     auto const& src=l==0?input:a[l-1];
@@ -303,6 +313,7 @@ public:
     for(const auto& p:pending)change[p.row]+=p.difference*src[p.col];
     for(int r=0;r<L.out;r++){
       if(change[r]==0)continue;
+      if(delta_cancellation_risk(z[l][r],change[r])){forward();return;}
       double old=a[l][r];z[l][r]+=change[r];finite(z[l][r],"batch delta activation");
       a[l][r]=act(z[l][r],L.type);change[r]=a[l][r]-old;
       if(change[r]!=0)active.push_back(r);
@@ -314,13 +325,14 @@ public:
       for(int r=0;r<next.out;r++){
         double dz=0;size_t base=static_cast<size_t>(r)*next.in;
         for(int c:active)dz+=next.effective(base+static_cast<size_t>(c))*change[c];
+        if(delta_cancellation_risk(z[k][r],dz)){forward();return;}
         double old=a[k][r];z[k][r]+=dz;finite(z[k][r],"batch propagated activation");
         a[k][r]=act(z[k][r],next.type);newchanges[r]=a[k][r]-old;
         if(newchanges[r]!=0)next_active.push_back(r);
       }
       change=std::move(newchanges);active=std::move(next_active);
     }
-    cache=true;cache_version=version;pending.clear();pending_layer=-1;
+    cache=true;cache_canonical=false;cache_version=version;pending.clear();pending_layer=-1;
     delta_streak++;counters.delta++;if(mode==AUTO)counters.auto_delta++;
   }
   // Graph-specific change propagation: only changed edges are visited.
@@ -344,6 +356,7 @@ public:
     const bool partial=mode!=FULL && delta_streak<128 &&
        (mode==DELTA || (full_cost()>=65536 && pessimistic<full*0.60));
     if(!partial){if(mode==AUTO){counters.auto_full++;counters.input_auto_full++;}forward();return;}
+    cache=false;
     std::vector<std::vector<std::pair<int,double>>> changed(layers.size());
     for(size_t k=0;k<layers.size();++k){
       const Layer& l=layers[k];
@@ -360,6 +373,7 @@ public:
         }
         require(offset==static_cast<size_t>(l.in),"graph offset mismatch");
         if(dz==0.0)continue;
+        if(delta_cancellation_risk(z[k][static_cast<size_t>(r)],dz)){forward();return;}
         const double old=a[k][static_cast<size_t>(r)];
         z[k][static_cast<size_t>(r)]+=dz;finite(z[k][static_cast<size_t>(r)],"graph propagated preactivation");
         a[k][static_cast<size_t>(r)]=act(z[k][static_cast<size_t>(r)],l.type);
@@ -367,7 +381,7 @@ public:
         if(delta!=0.0)diff.push_back({r,delta});
       }
     }
-    cache=true;cache_version=version;pending_input.clear();
+    cache=true;cache_canonical=false;cache_version=version;pending_input.clear();
     delta_streak++;counters.delta++;counters.input_delta++;
     if(mode==AUTO)counters.auto_delta++;
   }
@@ -398,6 +412,7 @@ public:
     const bool choose=(mode==DELTA || (mode==AUTO && full_cost()>=1024 && estimate<full*0.70))
                  && delta_streak<128;
     if(!choose){if(mode==AUTO){counters.auto_full++;counters.input_auto_full++;}forward();return;}
+    cache=false;
     std::vector<double> change(first.out,0.0);
     for(const auto& p:effective)
       for(int r=0;r<first.out;r++)
@@ -405,6 +420,7 @@ public:
     std::vector<int> active;
     for(int r=0;r<first.out;r++){
       if(change[r]==0.0)continue;
+      if(delta_cancellation_risk(z[0][r],change[r])){forward();return;}
       const double old=a[0][r];z[0][r]+=change[r];finite(z[0][r],"input delta preactivation");
       a[0][r]=act(z[0][r],first.type);change[r]=a[0][r]-old;
       if(change[r]!=0.0)active.push_back(r);
@@ -417,13 +433,14 @@ public:
       for(int r=0;r<next.out;r++){
         double dz=0.0;const size_t row=static_cast<size_t>(r)*next.in;
         for(int col:active)dz+=next.effective(row+static_cast<size_t>(col))*change[col];
+        if(delta_cancellation_risk(z[k][r],dz)){forward();return;}
         const double old=a[k][r];z[k][r]+=dz;finite(z[k][r],"input delta propagated preactivation");
         a[k][r]=act(z[k][r],next.type);next_change[r]=a[k][r]-old;
         if(next_change[r]!=0.0)next_active.push_back(r);
       }
       change=std::move(next_change);active=std::move(next_active);
     }
-    cache=true;cache_version=version;pending_input.clear();
+    cache=true;cache_canonical=false;cache_version=version;pending_input.clear();
     delta_streak++;counters.delta++;counters.input_delta++;
     if(mode==AUTO)counters.auto_delta++;
   }
