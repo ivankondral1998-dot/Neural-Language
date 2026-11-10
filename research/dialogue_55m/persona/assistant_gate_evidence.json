@@ -1,0 +1,27 @@
+{
+  "assistant_method": "NeuralLanguageAssistant/0.5 policy adapted to 55M PyTorch experiment",
+  "baseline_checkpoint_sha256": "ecc3d0bcd2370f733070cc1de5c1fd3728d3b1ef523640a80cb2e2c22d43d442",
+  "candidate_checkpoint_sha256": "ca9375a4c77f8410ed145518f513c8b183ed801511b0db2b14e3a6bb5e1dcb0b",
+  "candidate_checkpoint_bytes": 221798795,
+  "train_dataset_sha256": "290451355442ea3675580ae117b566f87b0ae7fd6a412670b461e0af51bb9b34",
+  "validation_dataset_sha256": "30ef8c7175ccc22f6507ca5c093f3ceec8648f53c3b7907c8119013fd42cd445",
+  "test_dataset_sha256": "852bdb993cee8473b3ca2abda0f784d2e77865b8a14864db027a172dd92acf63",
+  "rows": {
+    "train": 78,
+    "validation": 13,
+    "test": 13
+  },
+  "steps": 2,
+  "lr": 0.00001,
+  "original_assistant_invoked_on_transformer": false,
+  "baseline_validation_loss": 3.3861565289629496,
+  "candidate_validation_loss": 3.3035578307336766,
+  "relative_validation_gain": 0.02439305375365203,
+  "baseline_validation_byte_accuracy": 0.3224181360201511,
+  "candidate_validation_byte_accuracy": 0.3224181360201511,
+  "test_nll": 3.2990605995137856,
+  "test_byte_accuracy": 0.32142857142857145,
+  "test_used_for_decision": false,
+  "decision": "ACCEPT",
+  "conversational_ability_proven": false
+}

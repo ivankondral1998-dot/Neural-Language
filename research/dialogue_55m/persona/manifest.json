@@ -1,0 +1,39 @@
+{
+  "schema": "NL-PERSONA-DATA/1",
+  "data_kind": "original_synthetic_generalized_from_interaction_principles",
+  "generated": "2026-11-11",
+  "source_limit": "Accessible current chat, user instructions, and summarized prior chat context; not a complete verbatim export",
+  "dataset": {
+    "train": {
+      "rows": 78,
+      "sha256": "290451355442ea3675580ae117b566f87b0ae7fd6a412670b461e0af51bb9b34"
+    },
+    "validation": {
+      "rows": 13,
+      "sha256": "30ef8c7175ccc22f6507ca5c093f3ceec8648f53c3b7907c8119013fd42cd445"
+    },
+    "test": {
+      "rows": 13,
+      "sha256": "852bdb993cee8473b3ca2abda0f784d2e77865b8a14864db027a172dd92acf63"
+    }
+  },
+  "categories": [
+    "warmth",
+    "identity",
+    "banter",
+    "empathy",
+    "independence",
+    "engineering",
+    "accountability",
+    "initiative",
+    "tone",
+    "values",
+    "boundaries",
+    "projects",
+    "profanity"
+  ],
+  "exact_prompt_overlap": false,
+  "byte_context_limit": 128,
+  "includes_verbatim_private_chats": false,
+  "quality_proven": false
+}
