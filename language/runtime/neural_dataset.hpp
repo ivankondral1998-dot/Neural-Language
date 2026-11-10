@@ -63,8 +63,9 @@ inline void visit_dataset_rows(const std::string& path, int samples, int width,
 inline std::vector<DatasetRow> read_dataset(const std::string& path, int samples,
                                             int width, int classes = 0) {
     std::vector<DatasetRow> rows;
-    rows.reserve(static_cast<size_t>(samples));
     visit_dataset_rows(path, samples, width, classes, [&](DatasetRow&& row) {
+        // Invalid C++ API sample counts must be rejected before reserve().
+        if (rows.empty()) rows.reserve(static_cast<size_t>(samples));
         rows.push_back(std::move(row));
     });
     return rows;
