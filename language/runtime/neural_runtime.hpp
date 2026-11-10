@@ -83,7 +83,7 @@ struct Snapshot {std::vector<Layer> layers;uint64_t version;std::vector<double> 
 class Model {
 public:
   std::string name; int ninput;std::vector<Layer> layers; std::vector<double> input;
-  std::vector<std::vector<double>> z,a; bool has_input=false,cache=false,cache_canonical=false;
+  std::vector<std::vector<double>> z,a; bool has_input=false,cache=false,cache_canonical=false,cache_incremental_safe=true;
   uint64_t version=0,cache_version=0;Counters counters;
   std::map<std::string,Snapshot> saved;
   struct Pending {int row, col;double difference;};
@@ -244,13 +244,15 @@ public:
   void forward() {
     require(has_input,"observe an input before inference");
     // A failed computation must not leave a valid cache with partially written activations.
-    cache=false;cache_canonical=false;
+    cache=false;cache_canonical=false;cache_incremental_safe=true;
     for(size_t k=0;k<layers.size();k++) {
       const auto& l=layers[k];std::vector<double> combined;
       const auto& prev=graph?layer_input(k,combined):(k?a[k-1]:input);
       if((int)z[k].size()!=l.out){z[k].assign(l.out,0);a[k].assign(l.out,0);} else {std::fill(z[k].begin(),z[k].end(),0.0);std::fill(a[k].begin(),a[k].end(),0.0);}
       const bool blas = has_blas && l.storage==0 && l.disabled==0 && l.w.size()>=256;
       if(blas) {
+        // BLAS summation order is external: do not certify incremental reuse.
+        cache_incremental_safe=false;
         blas_gemv(l.out,l.in,l.w.data(),prev.data(),z[k].data());
         counters.blas_layers++;
         for(int r=0;r<l.out;r++) {
@@ -264,15 +266,31 @@ public:
         const double* const weights=l.w.data();
         for(int r=0;r<l.out;r++){
           double total=l.b[static_cast<size_t>(r)];
+          double max_term=std::abs(total);
           const double* const row=weights+static_cast<size_t>(r)*l.in;
-          for(int c=0;c<l.in;c++)total+=row[c]*x[c];
-          finite(total,"forward activation");z[k][r]=total;a[k][r]=act(total,l.type);
+          for(int c=0;c<l.in;c++){
+            const double term=row[c]*x[c];
+            total+=term;
+            max_term=std::max(max_term,std::abs(term));
+          }
+          finite(total,"forward activation");
+          if(max_term>std::max(1.0,std::abs(total))*1.e8)
+            cache_incremental_safe=false;
+          z[k][r]=total;a[k][r]=act(total,l.type);
         }
       } else {
         for(int r=0;r<l.out;r++){
-          double total=l.b[r];size_t base=static_cast<size_t>(r)*l.in;
-          for(int c=0;c<l.in;c++) total+=l.effective(base+c)*prev[c];
-          finite(total,"forward activation");z[k][r]=total;a[k][r]=act(total,l.type);
+          double total=l.b[r];double max_term=std::abs(total);
+          size_t base=static_cast<size_t>(r)*l.in;
+          for(int c=0;c<l.in;c++){
+            const double term=l.effective(base+c)*prev[c];
+            total+=term;
+            max_term=std::max(max_term,std::abs(term));
+          }
+          finite(total,"forward activation");
+          if(max_term>std::max(1.0,std::abs(total))*1.e8)
+            cache_incremental_safe=false;
+          z[k][r]=total;a[k][r]=act(total,l.type);
         }
       }
     }
@@ -292,7 +310,7 @@ public:
     return cost;
   }
   bool choose_delta()const {
-    if(graph||mode==FULL||!cache||pending.empty()||pending_layer<0)return false;
+    if(graph||mode==FULL||!cache||!cache_incremental_safe||pending.empty()||pending_layer<0)return false;
     if(delta_streak>=128)return false; // Bound long-term floating point drift.
     if(mode==DELTA)return true;
     if(full_cost()<1024)return false;
@@ -353,7 +371,7 @@ public:
         pessimistic+=double(nn)*l.out*(parent<0?14.0:1.0);
       }
     }
-    const bool partial=mode!=FULL && delta_streak<128 &&
+    const bool partial=mode!=FULL && cache_incremental_safe && delta_streak<128 &&
        (mode==DELTA || (full_cost()>=65536 && pessimistic<full*0.60));
     if(!partial){if(mode==AUTO){counters.auto_full++;counters.input_auto_full++;}forward();return;}
     cache=false;
@@ -410,7 +428,7 @@ public:
     double estimate=14.0*effective.size()*first.out+2.0*first.out;
     for(size_t k=1;k<layers.size();k++)estimate+=double(layers[k-1].out)*layers[k].out;
     const bool choose=(mode==DELTA || (mode==AUTO && full_cost()>=1024 && estimate<full*0.70))
-                 && delta_streak<128;
+                 && cache_incremental_safe && delta_streak<128;
     if(!choose){if(mode==AUTO){counters.auto_full++;counters.input_auto_full++;}forward();return;}
     cache=false;
     std::vector<double> change(first.out,0.0);
@@ -781,6 +799,7 @@ public:
     Model t(name,ninput);
     t.layers=layers;t.input=input;t.z=z;t.a=a;
     t.has_input=has_input;t.cache=cache;t.cache_canonical=cache_canonical;
+    t.cache_incremental_safe=cache_incremental_safe;
     t.version=version;t.cache_version=cache_version;
     t.pending=pending;t.pending_input=pending_input;t.pending_layer=pending_layer;t.delta_streak=delta_streak;
     t.mode=mode;t.graph=graph;
