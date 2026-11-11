@@ -166,11 +166,14 @@ public:
     return predicted_delta_cost(pending_layer) < full*0.85;
   }
   // Exact selective reduction. A touched row uses the same left-to-right FP64
-  // sum as scalar FULL, from stored effective weights. Downstream rows run
-  // only when an enabled edge comes from a neuron whose activation bits
-  // changed. Adding a difference onto cached z is not used. The new buffers
-  // replace the cache only after every finite check. A BLAS layer is rebuilt
-  // with the same GEMV as FULL; a partial BLAS sum is not claimed.
+  // sum as scalar FULL, from stored effective weights. A downstream row is
+  // rebuilt when an enabled input changed, and also when a disabled input's
+  // activation changes sign: FULL still adds +0 times that activation, and
+  // the sign of that zero is part of the bitwise result. Adding a difference
+  // onto cached z is not used. The new buffers replace the cache only after
+  // every finite check. A BLAS layer is rebuilt with the same GEMV as FULL;
+  // a partial BLAS sum is not claimed. BLAS is only eligible when no edge is
+  // disabled, so this signed-zero fan-out is a scalar-path case.
   void recompute_touched() {
     const size_t edited=static_cast<size_t>(pending_layer);
     require(cache && edited<layers.size(),"selective recompute requires a cached layer");
@@ -224,8 +227,10 @@ public:
       else {
         for(int r=0;r<l.out;r++) {
           const size_t base=static_cast<size_t>(r)*static_cast<size_t>(l.in);
-          for(int c=0;c<l.in;c++) if(changed[static_cast<size_t>(c)] && l.enabled[base+static_cast<size_t>(c)]) {
-            next_rows[static_cast<size_t>(r)]=1;break;
+          for(int c=0;c<l.in;c++) if(changed[static_cast<size_t>(c)]) {
+            const size_t ix=base+static_cast<size_t>(c);
+            const bool sign_changed=std::signbit(a[k-1][static_cast<size_t>(c)])!=std::signbit(na[k-1][static_cast<size_t>(c)]);
+            if(l.enabled[ix] || sign_changed) {next_rows[static_cast<size_t>(r)]=1;break;}
           }
         }
       }
@@ -270,7 +275,8 @@ public:
     // a record that the layer changed.
     const double updated=L.effective(ix);
     version++;counters.events++;
-    if(old==updated){if(cache&&pending.empty())cache_version=version;return;}
+    // Numeric == treats -0 and +0 as equal, but FULL multiplies the stored bits.
+    if(same_bits(old,updated)){if(cache&&pending.empty())cache_version=version;return;}
     if(mode==FULL || !cache) {cache=false;pending.clear();pending_layer=-1;return;}
     if(pending.empty())pending_layer=l;
     pending.push_back({row,col,updated-old});

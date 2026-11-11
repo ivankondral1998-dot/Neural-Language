@@ -286,6 +286,108 @@ int main() {
     if (bits_differ(m.z[0][0], z0) || bits_differ(m.a[0][0], a0))
       return fail(25, "case K published a partial activation");
   }
+  // L. Disabled edge still adds +0*activation. A sign change of zero must
+  // match FULL after every edit, not only at the end of a series.
+  {
+    auto check_now = [&](neural::Model& d, int code, const char* msg) {
+      neural::Model f = d.isolated_copy();
+      f.mode = neural::Model::FULL;
+      f.cache = false;
+      f.infer(false);
+      if (int bad = same_state(d, f, code)) return fail(bad, msg);
+      return 0;
+    };
+    neural::Model d("l", 1);
+    d.mode = neural::Model::DELTA;
+    d.layer("h", 1, 0, 11, 0);
+    d.layer("out", 1, 0, 12, 0);
+    d.layers[0].assign_weight(0, -1.0);
+    d.layers[0].b[0] = -0.0;
+    d.layers[1].b[0] = -0.0;
+    d.gate("out", 0, 0, false);
+    d.observe({+0.0});
+    d.infer(false);
+    if (int bad = check_now(d, 26, "case L initial")) return bad;
+    d.change("h", 0, 0, 2.0);
+    d.infer(false);
+    if (int bad = check_now(d, 27, "case L sign zero")) return bad;
+    if (d.counters.delta == 0) return fail(28, "case L did not use the selective path");
+    d.change("h", 0, 0, -2.0);
+    d.infer(false);
+    if (int bad = check_now(d, 29, "case L sign restored")) return bad;
+    d.gate("out", 0, 0, true);
+    d.infer(false);
+    if (int bad = check_now(d, 30, "case L edge enabled")) return bad;
+    d.change("h", 0, 0, 2.0);
+    d.infer(false);
+    if (int bad = check_now(d, 31, "case L after enable")) return bad;
+  }
+  // M. INT8 stored weights, disabled downstream edge, compare every step.
+  {
+    neural::Model d("m", 1);
+    d.mode = neural::Model::DELTA;
+    d.layer("h", 1, 0, 13, 1);
+    d.layer("out", 1, 1, 14, 0);
+    d.layers[0].assign_weight(0, -1.0);
+    d.layers[0].b[0] = -0.0;
+    d.layers[1].b[0] = -0.0;
+    d.gate("out", 0, 0, false);
+    d.observe({+0.0});
+    d.infer(false);
+    neural::Model f0 = d.isolated_copy();
+    f0.mode = neural::Model::FULL; f0.cache = false; f0.infer(false);
+    if (int bad = same_state(d, f0, 32)) return fail(bad, "case M initial");
+    d.change("h", 0, 0, 2.0);
+    d.infer(false);
+    neural::Model f1 = d.isolated_copy();
+    f1.mode = neural::Model::FULL; f1.cache = false; f1.infer(false);
+    if (int bad = same_state(d, f1, 33)) return fail(bad, "case M int8 sign");
+  }
+  // N. ReLU does not invent a negative zero, and a later linear layer still matches.
+  {
+    neural::Model d("n", 1);
+    d.mode = neural::Model::DELTA;
+    d.layer("h", 1, 1, 15, 0);
+    d.layer("mid", 1, 0, 16, 0);
+    d.layer("out", 1, 0, 17, 0);
+    d.layers[0].assign_weight(0, -1.0);
+    d.layers[0].b[0] = -0.0;
+    d.layers[1].b[0] = -0.0;
+    d.layers[2].assign_weight(0, 0.5);
+    d.gate("mid", 0, 0, false);
+    d.observe({+0.0});
+    d.infer(false);
+    d.change("h", 0, 0, 2.0);
+    d.infer(false);
+    d.change("out", 0, 0, -0.25);
+    d.infer(false);
+    neural::Model f = d.isolated_copy();
+    f.mode = neural::Model::FULL; f.cache = false; f.infer(false);
+    if (int bad = same_state(d, f, 34)) return fail(bad, "case N relu chain");
+  }
+  // O. A stored weight sign of zero is visible to FULL. -0 == +0 must not skip it.
+  {
+    neural::Model d("o", 1);
+    d.mode = neural::Model::DELTA;
+    d.layer("out", 1, 0, 18, 0);
+    d.layers[0].assign_weight(0, -0.0);
+    d.layers[0].b[0] = -0.0;
+    d.observe({1.0});
+    d.infer(false);
+    d.change("out", 0, 0, +0.0);
+    d.infer(false);
+    neural::Model f = d.isolated_copy();
+    f.mode = neural::Model::FULL; f.cache = false; f.infer(false);
+    if (int bad = same_state(d, f, 35)) return fail(bad, "case O weight sign");
+    d.layers[0].assign_weight(0, -0.0);
+    d.cache = false;
+    d.infer(false);
+    d.gate("out", 0, 0, false);
+    d.infer(false);
+    neural::Model g = d.isolated_copy();
+    g.mode = neural::Model::FULL; g.cache = false; g.infer(false);
+    if (int bad = same_state(d, g, 36)) return fail(bad, "case O gate sign");
+  }
   std::cout << "P0_NUMERIC_PASS\n";
   return 0;
 }
