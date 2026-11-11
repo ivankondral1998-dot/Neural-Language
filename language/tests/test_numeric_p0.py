@@ -388,6 +388,35 @@ int main() {
     g.mode = neural::Model::FULL; g.cache = false; g.infer(false);
     if (int bad = same_state(d, g, 36)) return fail(bad, "case O gate sign");
   }
+  // P. observe must treat +0 and -0 as different input states: FULL can
+  // distinguish them even when C++ vector<double>::operator== cannot.
+  for (int mode = 0; mode < 3; ++mode) {
+    neural::Model d("p", 1);
+    d.mode = static_cast<neural::Model::Mode>(mode);
+    d.layer("out", 1, 0, 19, 0);
+    d.layers[0].assign_weight(0, -1.0);
+    d.layers[0].b[0] = -0.0;
+    d.observe({+0.0});
+    if (!std::signbit(d.infer(false)[0])) return fail(37, "case P initial -0 lost");
+    d.observe({-0.0});
+    if (d.cache) return fail(38, "case P input sign change left stale cache");
+    neural::Model oracle = d.isolated_copy();
+    oracle.mode = neural::Model::FULL;
+    oracle.cache = false;
+    oracle.infer(false);
+    d.infer(false);
+    if (int bad = same_state(d, oracle, 40)) return fail(bad, "case P +0 to -0 != FULL");
+    if (std::signbit(d.a.back()[0])) return fail(41, "case P new input +0 output missing");
+    d.observe({+0.0});
+    if (d.cache) return fail(42, "case P reversed sign left stale cache");
+    oracle = d.isolated_copy();
+    oracle.mode = neural::Model::FULL;
+    oracle.cache = false;
+    oracle.infer(false);
+    d.infer(false);
+    if (int bad = same_state(d, oracle, 43)) return fail(bad, "case P -0 to +0 != FULL");
+    if (!std::signbit(d.a.back()[0])) return fail(44, "case P restored -0 output missing");
+  }
   std::cout << "P0_NUMERIC_PASS\n";
   return 0;
 }
