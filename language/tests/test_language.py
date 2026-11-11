@@ -171,9 +171,13 @@ expect [0] tolerance 1e-12
         src=PREAMBLE+'predict'
         p=self.td/'orig.nir';p.write_text(src)
         old=p.read_bytes()
-        r=run_native(src,self.td,'runtimefail')
+        # This invalid source must now fail BEFORE C++ generation, not at runtime.
+        out=self.td/'runtimefail'
+        r=subprocess.run([sys.executable,str(ROOT/'compiler.py'),str(p),'-o',str(out)],
+                         capture_output=True,text=True)
         self.assertNotEqual(r.returncode,0)
         self.assertIn('observe',r.stderr)
+        self.assertFalse(out.exists())
         self.assertEqual(p.read_bytes(),old)
 
 if __name__=='__main__':unittest.main(verbosity=2)
@@ -196,6 +200,6 @@ class PreservationTests(unittest.TestCase):
         self.assertTrue((self.td/'saved_1.json').exists())
     def test_checkpoint_duplicate_rejected(self):
         src='''brain Test {\n senses 1\n neurons result 1 linear\n init 5\n}\nremember start\nremember start'''
-        r=run_native(src,self.td,'dup_checkpoint')
-        self.assertNotEqual(r.returncode,0)
-        self.assertIn('checkpoint already exists',r.stderr)
+        # Guaranteed duplicate is now detected before code generation.
+        with self.assertRaisesRegex(CompileError, 'checkpoint already exists'):
+            parse(src)
