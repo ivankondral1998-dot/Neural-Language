@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <fstream>
 #include <filesystem>
@@ -178,6 +179,7 @@ public:
     const size_t edited=static_cast<size_t>(pending_layer);
     require(cache && edited<layers.size(),"selective recompute requires a cached layer");
     std::vector<std::vector<double>> nz=z,na=a;
+    size_t staged_blas_layers=0;
     std::vector<char> changed;
     auto write_row=[&](size_t k,int r,const std::vector<double>& prev) {
       const Layer& l=layers[k];
@@ -204,7 +206,7 @@ public:
           ta[static_cast<size_t>(r)]=act(tz[static_cast<size_t>(r)],l.type);
           if(!same_bits(ta[static_cast<size_t>(r)],a[k][static_cast<size_t>(r)])) changed[static_cast<size_t>(r)]=1;
         }
-        nz[k].swap(tz);na[k].swap(ta);counters.blas_layers++;
+        nz[k].swap(tz);na[k].swap(ta);++staged_blas_layers;
         return;
       }
       for(int r=0;r<l.out;r++) if(rows[static_cast<size_t>(r)]) write_row(k,r,prev);
@@ -237,6 +239,7 @@ public:
       refresh(k,next_rows,na[k-1]);
     }
     z.swap(nz);a.swap(na);
+    counters.blas_layers+=staged_blas_layers;
   }
   void flush_pending() {
     if(pending.empty())return;
