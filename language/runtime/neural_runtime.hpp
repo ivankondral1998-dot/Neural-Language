@@ -96,7 +96,7 @@ public:
     layers.push_back(std::move(l));
     z.resize(layers.size());a.resize(layers.size());
   }
-  void observe(std::vector<double> x){require((int)x.size()==ninput,"input shape mismatch");for(double v:x)finite(v,"input");if(!has_input||x!=input) {cache=false;pending.clear();pending_layer=-1;delta_streak=0;} input=std::move(x);has_input=true;}
+  void observe(std::vector<double> x){require((int)x.size()==ninput,"input shape mismatch");for(double v:x)finite(v,"input");if(!has_input||input.size()!=x.size()||std::memcmp(x.data(),input.data(),x.size()*sizeof(double))!=0) {cache=false;pending.clear();pending_layer=-1;delta_streak=0;} input=std::move(x);has_input=true;}
   // All full passes use the same FP64 weights, activation semantics and mask.
   // A BLAS matrix-vector multiply is used only when every edge is enabled.
   // Canonical reduction shared by FULL and by the incremental suffix.
