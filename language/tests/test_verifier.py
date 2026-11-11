@@ -85,30 +85,53 @@ int main(){
             ran=subprocess.run([str(p/'s')],capture_output=True,text=True,timeout=10)
             self.assertEqual(ran.returncode,0,ran.stderr)
 
-    def test_mutation_detects_old_int8_rounding_defect(self):
+    def test_int8_delta_follows_stored_quantized_weight(self):
+        """Sub-quantum requests must not move DELTA off the stored INT8 weight.
+
+        The previous source-mutation canary corrupted a local `updated` value and
+        expected verify() to fail. That local no longer feeds the numeric path:
+        both FULL and the incremental suffix recompute from stored effective
+        weights. A direct oracle now guards the same contract.
+        """
         if not self.cxx:self.skipTest('C++ compiler absent')
-        h=(ROOT/'runtime/neural_runtime.hpp').read_text()
-        bug='const double updated=L.effective(ix);'
-        self.assertEqual(h.count(bug),1)
-        h=h.replace(bug,'const double updated=new_gate ? new_weight : 0.0;')
+        header=(ROOT/'runtime/neural_runtime.hpp').read_text()
+        self.assertEqual(header.count('const double updated=L.effective(ix);'),1)
         cxx=r'''#include "neural_runtime.hpp"
-#include <exception>
+#include <cstdint>
+#include <cstring>
 #include <iostream>
-int main() {
- neural::Model m("corrupted",3);
- m.layer("h",6,1,31,1);m.layer("out",2,2,19,1);
- m.observe({0.4,0.2,0.9});
- try {m.verify(250);}
- catch(const std::exception& e){std::cerr<<e.what()<<"\n";return 10;}
+int bits_differ(double x,double y){
+ uint64_t a,b; static_assert(sizeof(double)==8,"double");
+ std::memcpy(&a,&x,8); std::memcpy(&b,&y,8); return a!=b;
+}
+int main(){
+ neural::Model d("q",1); d.mode=neural::Model::DELTA;
+ d.layer("o",1,0,1,1);
+ d.layers[0].q[0]=10;
+ d.observe({0.5}); d.infer(false);
+ const double scale=d.layers[0].scale;
+ const auto q_before=d.layers[0].q;
+ d.change("o",0,0,scale*0.1);
+ if(d.layers[0].q!=q_before){std::cerr<<"subquantum changed code\n";return 2;}
+ double y=d.infer(false)[0];
+ neural::Model f("f",1); f.mode=neural::Model::FULL;
+ f.layer("o",1,0,1,1);
+ f.layers[0].q=q_before; f.layers[0].enabled=d.layers[0].enabled; f.layers[0].b=d.layers[0].b;
+ f.observe({0.5});
+ if(bits_differ(y,f.infer(false)[0])){std::cerr<<"subquantum delta diverged\n";return 3;}
+ d.change("o",0,0,scale*3.0);
+ const double stored=d.layers[0].effective(0);
+ double oracle=d.layers[0].b[0]+stored*0.5;
+ if(bits_differ(d.infer(false)[0],oracle)){std::cerr<<"quantized oracle mismatch\n";return 4;}
+ if(d.counters.delta==0){std::cerr<<"delta path not used\n";return 5;}
  return 0;
 }'''
         with tempfile.TemporaryDirectory() as td:
-            p=pathlib.Path(td);(p/'neural_runtime.hpp').write_text(h);(p/'bug.cpp').write_text(cxx)
-            build=subprocess.run([self.cxx,'-std=c++17','-O2','-Wall','-Wextra','-Werror','-I',str(p),str(p/'bug.cpp'),'-o',str(p/'bug')],capture_output=True,text=True,timeout=45)
+            p=pathlib.Path(td);(p/'q.cpp').write_text(cxx)
+            build=subprocess.run([self.cxx,'-std=c++17','-O2','-Wall','-Wextra','-Werror','-I',str(ROOT/'runtime'),str(p/'q.cpp'),'-o',str(p/'q')],capture_output=True,text=True,timeout=45)
             self.assertEqual(build.returncode,0,build.stderr)
-            ran=subprocess.run([str(p/'bug')],capture_output=True,text=True,timeout=15)
-            self.assertEqual(ran.returncode,10,ran.stdout+'\n'+ran.stderr)
-            self.assertIn('verify numerical mismatch',ran.stderr)
+            ran=subprocess.run([str(p/'q')],capture_output=True,text=True,timeout=15)
+            self.assertEqual(ran.returncode,0,ran.stdout+'\n'+ran.stderr)
 
 
 if __name__=='__main__':
