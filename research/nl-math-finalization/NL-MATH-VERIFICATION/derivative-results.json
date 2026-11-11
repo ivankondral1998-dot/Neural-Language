@@ -1,0 +1,24 @@
+{
+  "max_abs_residuals": {
+    "matmul_A_0.0001": 3.574918139293004e-13,
+    "matmul_B_0.0001": 2.675359933590471e-13,
+    "matmul_A_1e-05": 2.7631230636870896e-12,
+    "matmul_B_1e-05": 2.850664149178783e-12,
+    "matmul_A_1e-06": 1.3890222305690259e-11,
+    "matmul_B_1e-06": 3.3481772909738083e-11,
+    "LN_0.0001": 2.029725498786661e-09,
+    "LN_1e-05": 1.5225876115465553e-11,
+    "LN_1e-06": 8.964806674782722e-11,
+    "attention_Q_0.0001": 3.1899968777615584e-11,
+    "attention_K_0.0001": 9.14671116625243e-12,
+    "attention_V_0.0001": 8.068545831463325e-14,
+    "attention_Q_1e-05": 1.6527057500326237e-12,
+    "attention_K_1e-05": 2.2246579578499848e-12,
+    "attention_V_1e-05": 1.222300038961066e-12,
+    "attention_Q_1e-06": 7.203820873158406e-12,
+    "attention_K_1e-06": 7.203820873158406e-12,
+    "attention_V_1e-06": 1.9594326161609388e-11
+  },
+  "threshold_declared": 1e-07,
+  "scope": "tiny smooth real-operator checks; no training; no global machine accuracy proof"
+}

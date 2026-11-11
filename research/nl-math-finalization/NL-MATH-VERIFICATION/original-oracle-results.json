@@ -1,0 +1,152 @@
+{
+  "E01_layernorm": {
+    "input": [
+      1e+20,
+      1.0000000000000002e+20
+    ],
+    "epsilon": 1e-05,
+    "actual": [
+      -1.4142135623729801,
+      0.0
+    ],
+    "decimal120_reference": [
+      -0.9999999999999255,
+      0.9999999999999255
+    ],
+    "sum_actual": -1.4142135623729801
+  },
+  "E02_attention_overflow": {
+    "error": "OverflowError",
+    "message": "intermediate overflow in fsum",
+    "exact_result": [
+      [
+        1e+308
+      ],
+      [
+        1e+308
+      ]
+    ]
+  },
+  "E03_nll_loss": {
+    "actual": 0.0,
+    "log1p_reference": 4.248354255291589e-18
+  },
+  "E04_integer_dot": {
+    "actual": 0.0,
+    "exact_integer_result": 1
+  },
+  "E05_invalid_sparse": {
+    "nan": {
+      "full": {
+        "error": "ValueError",
+        "message": "out-of-contract finite number"
+      },
+      "partial": {
+        "value": [
+          [
+            [
+              0.0
+            ]
+          ],
+          [
+            [
+              0.0
+            ]
+          ]
+        ]
+      }
+    },
+    "limit": {
+      "full": {
+        "error": "ValueError",
+        "message": "out-of-contract finite number"
+      },
+      "partial": {
+        "value": [
+          [
+            [
+              0.0
+            ]
+          ],
+          [
+            [
+              0.0
+            ]
+          ]
+        ]
+      }
+    }
+  },
+  "E06_revision_overflow": {
+    "status": "ACCEPT_FOR_REVIEW",
+    "version": 18446744073709551617,
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "E06_infinite_checks": {
+    "status": "ACCEPT_FOR_REVIEW",
+    "version": 1,
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "E07_frozen_gradient": {
+    "x": 2,
+    "upstream": 3,
+    "derivative_w0": 6,
+    "frozen_update": 0
+  },
+  "E08_bound_ambiguity": {
+    "f": "0",
+    "f_tilde": "100*x",
+    "reference_input": 0,
+    "approx_input": 0.1,
+    "L_f": 0,
+    "delta_at_reference": 0,
+    "invalid_bound": 0,
+    "actual_error": 10
+  },
+  "E09_tolerance_not_equivalence": {
+    "epsilon": 1,
+    "a": 0,
+    "b": 0.75,
+    "c": 1.5,
+    "a_close_b": true,
+    "b_close_c": true,
+    "a_close_c": false
+  },
+  "historical006": {
+    "nll": {
+      "error": "ValueError",
+      "message": "only finite scalars allowed"
+    },
+    "dot": {
+      "value": "inf"
+    },
+    "layernorm": {
+      "error": "OverflowError",
+      "message": "(34, 'Numerical result out of range')"
+    },
+    "attention": {
+      "value": [
+        [
+          "nan",
+          "nan"
+        ]
+      ]
+    }
+  },
+  "delta_0_1": {
+    "full": 0.0,
+    "algebraic": 1.0
+  },
+  "delta_5_0": {
+    "full": 5.0,
+    "algebraic": 0.0
+  },
+  "diamond_chain_rule": {
+    "actual": 2.0064,
+    "rational_reference": 2.0064
+  },
+  "counts": {
+    "parameters": 55630656,
+    "kv_fp16_bytes": 31457280
+  }
+}

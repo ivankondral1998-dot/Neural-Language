@@ -1,0 +1,17 @@
+{
+  "E01": {
+    "actual": [
+      -1.4142135623729801,
+      0.0
+    ],
+    "decimal_reference": [
+      -0.9999999999999255,
+      0.9999999999999255
+    ]
+  },
+  "E02": "OverflowError",
+  "E03": "loss rounded to zero",
+  "E04": "integer input rounded before exact dot",
+  "E05": "FULL rejects, sparse accepts",
+  "E06": "invalid revision and infinite checks accepted"
+}

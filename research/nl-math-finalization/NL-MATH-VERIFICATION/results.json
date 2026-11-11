@@ -1,0 +1,33 @@
+{
+  "E01": {
+    "actual_old_expression": [
+      -1.4142135623729801,
+      0.0
+    ],
+    "decimal_reference": [
+      -0.9999999999999255,
+      0.9999999999999255
+    ]
+  },
+  "E02": {
+    "old_unnormalized": "OverflowError",
+    "exact_answer": 1e+308
+  },
+  "E03": {
+    "old": 0,
+    "reference": 4.248354255291589e-18
+  },
+  "E04": {
+    "exact_integer": 1,
+    "after_float_cast": 0
+  },
+  "delta": {
+    "full": 0,
+    "naive": 1
+  },
+  "E09": "tolerance is not transitive",
+  "E16": {
+    "oracle_grouping": -0.021,
+    "native_grouping": -0.020999999999999998
+  }
+}
