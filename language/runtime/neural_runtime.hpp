@@ -98,39 +98,48 @@ public:
   void observe(std::vector<double> x){require((int)x.size()==ninput,"input shape mismatch");for(double v:x)finite(v,"input");if(!has_input||x!=input) {cache=false;pending.clear();pending_layer=-1;delta_streak=0;} input=std::move(x);has_input=true;}
   // All full passes use the same FP64 weights, activation semantics and mask.
   // A BLAS matrix-vector multiply is used only when every edge is enabled.
-  void forward() {
+  // Canonical reduction shared by FULL and by the incremental suffix.
+  // Activations commit only after every checked value is finite, so a rejection
+  // does not leave a half-updated cache for the next infer.
+  void compute_from(size_t start) {
     require(has_input,"observe an input before inference");
-    for(size_t k=0;k<layers.size();k++) {
-      const auto& l=layers[k];const auto& prev=k?a[k-1]:input;
-      if((int)z[k].size()!=l.out){z[k].assign(l.out,0);a[k].assign(l.out,0);} else {std::fill(z[k].begin(),z[k].end(),0.0);std::fill(a[k].begin(),a[k].end(),0.0);}
+    require(start<=layers.size(),"internal compute cursor");
+    std::vector<std::vector<double>> nz(layers.size()),na(layers.size());
+    for(size_t k=0;k<start;k++){nz[k]=z[k];na[k]=a[k];}
+    size_t blas_used=0;
+    for(size_t k=start;k<layers.size();k++) {
+      const auto& l=layers[k];const auto& prev=k==0?input:na[k-1];
+      nz[k].assign(l.out,0.0);na[k].assign(l.out,0.0);
       const bool blas = has_blas && l.storage==0 && l.disabled==0 && l.w.size()>=256;
       if(blas) {
-        blas_gemv(l.out,l.in,l.w.data(),prev.data(),z[k].data());
-        counters.blas_layers++;
+        blas_gemv(l.out,l.in,l.w.data(),prev.data(),nz[k].data());
+        blas_used++;
         for(int r=0;r<l.out;r++) {
-          z[k][r]+=l.b[r];finite(z[k][r],"forward activation");a[k][r]=act(z[k][r],l.type);
+          nz[k][r]+=l.b[r];finite(nz[k][r],"forward activation");na[k][r]=act(nz[k][r],l.type);
         }
       } else {
         for(int r=0;r<l.out;r++){
           double total=l.b[r];size_t base=static_cast<size_t>(r)*l.in;
           for(int c=0;c<l.in;c++) total+=l.effective(base+c)*prev[c];
-          finite(total,"forward activation");z[k][r]=total;a[k][r]=act(total,l.type);
+          finite(total,"forward activation");nz[k][r]=total;na[k][r]=act(total,l.type);
         }
       }
     }
+    z.swap(nz);a.swap(na);counters.blas_layers+=blas_used;
+  }
+  void forward() {
+    compute_from(0);
     cache=true;cache_version=version;pending.clear();pending_layer=-1;delta_streak=0;counters.full++;
   }
   size_t weight_count()const {size_t n=0;for(auto& l:layers)n+=l.weight_count();return n;}
   size_t full_cost()const {return weight_count();}
-  // A batch affects one source layer. Its neuron activation deltas propagate once,
-  // regardless of how many different weights in that layer were edited.
+  // The incremental path recomputes the edited layer and every dependent layer.
+  // Cost follows that suffix. Adding a difference onto cached z is not used:
+  // it diverges from this reduction when large terms cancel.
   double predicted_delta_cost(int l)const {
-    double cost=6.0*pending.size()+2.0*layers[l].out;
-    size_t active=std::min(pending.size(),static_cast<size_t>(layers[l].out));
-    for(size_t k=l+1;k<layers.size();k++){
-      cost+=double(active)*layers[k].out;
-      active=static_cast<size_t>(layers[k].out);
-    }
+    double cost=0;
+    for(size_t k=static_cast<size_t>(l);k<layers.size();k++)
+      cost+=double(layers[k].weight_count())+double(layers[k].out);
     return cost;
   }
   bool choose_delta()const {
@@ -146,31 +155,10 @@ public:
   void flush_pending() {
     if(pending.empty())return;
     if(!choose_delta()){if(mode==AUTO)counters.auto_full++;forward();return;}
-    int l=pending_layer;
-    auto& L=layers[l];
-    auto const& src=l==0?input:a[l-1];
-    std::vector<double> change(L.out,0);
-    std::vector<int> active;
-    for(const auto& p:pending)change[p.row]+=p.difference*src[p.col];
-    for(int r=0;r<L.out;r++){
-      if(change[r]==0)continue;
-      double old=a[l][r];z[l][r]+=change[r];finite(z[l][r],"batch delta activation");
-      a[l][r]=act(z[l][r],L.type);change[r]=a[l][r]-old;
-      if(change[r]!=0)active.push_back(r);
-    }
-    for(size_t k=l+1;k<layers.size();k++){
-      const Layer& next=layers[k];std::vector<double> newchanges(next.out,0);
-      std::vector<int> next_active;
-      if(active.empty())break;
-      for(int r=0;r<next.out;r++){
-        double dz=0;size_t base=static_cast<size_t>(r)*next.in;
-        for(int c:active)dz+=next.effective(base+static_cast<size_t>(c))*change[c];
-        double old=a[k][r];z[k][r]+=dz;finite(z[k][r],"batch propagated activation");
-        a[k][r]=act(z[k][r],next.type);newchanges[r]=a[k][r]-old;
-        if(newchanges[r]!=0)next_active.push_back(r);
-      }
-      change=std::move(newchanges);active=std::move(next_active);
-    }
+    require(pending_layer>=0&&static_cast<size_t>(pending_layer)<layers.size(),"pending layer invalid");
+    // Same reduction as forward(), from the edited layer downward. Stored
+    // effective weights are the source of truth, including INT8 rounding.
+    compute_from(static_cast<size_t>(pending_layer));
     cache=true;cache_version=version;pending.clear();pending_layer=-1;
     delta_streak++;counters.delta++;if(mode==AUTO)counters.auto_delta++;
   }
@@ -198,7 +186,9 @@ public:
     }
     L.assign_weight(ix,new_weight);
     L.enabled[ix]=static_cast<uint8_t>(new_gate);
-    // Delta must use the rounded, effective weight, not the unquantized request.
+    // Reject a no-op using the rounded effective weight, not the unquantized request.
+    // Inference recomputes from stored effective weights; this difference is only
+    // a record that the layer changed.
     const double updated=L.effective(ix);
     version++;counters.events++;
     if(old==updated){if(cache&&pending.empty())cache_version=version;return;}
@@ -229,9 +219,11 @@ public:
         grad[k][j]=v*derivative(z[k][j],a[k][j],layers[k].type);
       }
     }
-    // All gradients calculated using old weights; update after backpropagation.
-    for(size_t k=0;k<layers.size();k++){
-      Layer& l=layers[k];const auto& prev=k?a[k-1]:input;
+    // All gradients calculated using old weights; publish one staged network
+    // only after every new weight and bias has passed the numeric contract.
+    auto staged=layers;
+    for(size_t k=0;k<staged.size();k++){
+      Layer& l=staged[k];const auto& prev=k?a[k-1]:input;
       for(int r=0;r<l.out;r++){
         for(int c=0;c<l.in;c++){
           size_t ix=static_cast<size_t>(r)*l.in+c;
@@ -240,6 +232,7 @@ public:
         double b=l.b[r]-rate*grad[k][r];finite(b,"updated bias");l.b[r]=b;
       }
     }
+    layers.swap(staged);
     version++;cache=false;pending.clear();pending_layer=-1;delta_streak=0;counters.train++;
   }
   void checkpoint(const std::string& label){require(saved.count(label)==0,"checkpoint already exists; use a new name");require(saved.size()<64,"checkpoint limit");saved[label]=Snapshot{layers,version,input,has_input};std::cout<<"CHECKPOINT "<<label<<" version="<<version<<"\n";}
