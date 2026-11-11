@@ -182,6 +182,110 @@ int main() {
     if (bits_differ(got, f.infer(false)[0])) return fail(16, "case F AUTO != FULL");
     if (a.counters.delta == 0) return fail(17, "case F AUTO did not use the suffix");
   }
+  auto same_state = [](const neural::Model& d, const neural::Model& f, int code) {
+    if (d.layers.size() != f.layers.size()) return code;
+    for (size_t k = 0; k < d.layers.size(); ++k) {
+      if (d.z[k].size() != f.z[k].size() || d.a[k].size() != f.a[k].size()) return code;
+      for (size_t j = 0; j < d.z[k].size(); ++j)
+        if (bits_differ(d.z[k][j], f.z[k][j]) || bits_differ(d.a[k][j], f.a[k][j])) return code;
+    }
+    return 0;
+  };
+  // G. Many edits of the early layer stay bitwise equal to FULL.
+  {
+    neural::Model d("g", 4);
+    d.mode = neural::Model::DELTA;
+    d.layer("h", 6, 1, 9, 0);
+    d.layer("out", 3, 0, 10, 0);
+    d.observe({1.0, -0.5, 0.25, 0.125});
+    d.infer(false);
+    for (int i = 0; i < 40; ++i) {
+      d.change("h", i % 6, i % 4, (i % 2 ? 0.01 : -0.01));
+      d.infer(false);
+    }
+    neural::Model f = d.isolated_copy();
+    f.mode = neural::Model::FULL;
+    f.cache = false;
+    f.infer(false);
+    if (int code = same_state(d, f, 18)) return fail(code, "case G early edits != FULL");
+    if (d.counters.delta == 0) return fail(19, "case G did not use the selective path");
+  }
+  // H. A ReLU row that stays inactive updates z and does not move downstream bits.
+  {
+    neural::Model d("h", 1);
+    d.mode = neural::Model::DELTA;
+    d.layer("h", 1, 1, 2, 0);
+    d.layer("out", 1, 0, 3, 0);
+    d.layers[0].w = {-1.0};
+    d.layers[0].b = {-2.0};
+    d.layers[1].w = {4.0};
+    d.layers[1].b = {0.5};
+    d.observe({1.0});
+    d.infer(false);
+    const double downstream = d.a[1][0];
+    d.change("h", 0, 0, -0.25);
+    d.infer(false);
+    neural::Model f = d.isolated_copy();
+    f.mode = neural::Model::FULL;
+    f.cache = false;
+    f.infer(false);
+    if (int code = same_state(d, f, 20)) return fail(code, "case H relu != FULL");
+    if (bits_differ(d.a[0][0], 0.0) || bits_differ(d.a[1][0], downstream))
+      return fail(21, "case H inactive relu changed downstream");
+  }
+  // I. A disabled edge is part of the same reduction as FULL.
+  {
+    neural::Model d("i", 2);
+    d.mode = neural::Model::DELTA;
+    d.layer("h", 2, 0, 4, 0);
+    d.layer("out", 2, 0, 5, 0);
+    d.observe({0.5, -1.0});
+    d.infer(false);
+    d.gate("h", 1, 0, false);
+    d.infer(false);
+    d.change("out", 0, 1, 0.125);
+    d.infer(false);
+    neural::Model f = d.isolated_copy();
+    f.mode = neural::Model::FULL;
+    f.cache = false;
+    f.infer(false);
+    if (int code = same_state(d, f, 22)) return fail(code, "case I mask != FULL");
+  }
+  // J. INT8 edits follow the stored code, including a sub-quantum no-op.
+  {
+    neural::Model d("j", 2);
+    d.mode = neural::Model::DELTA;
+    d.layer("h", 2, 0, 6, 1);
+    d.layer("out", 1, 0, 7, 0);
+    d.observe({0.3, -0.7});
+    d.infer(false);
+    d.change("h", 0, 1, d.layers[0].scale * 0.1);
+    d.infer(false);
+    d.change("h", 1, 0, d.layers[0].scale * 3.0);
+    d.infer(false);
+    neural::Model f = d.isolated_copy();
+    f.mode = neural::Model::FULL;
+    f.cache = false;
+    f.infer(false);
+    if (int code = same_state(d, f, 23)) return fail(code, "case J int8 != FULL");
+  }
+  // K. A rejected preactivation must not publish a half-updated cache.
+  {
+    neural::Model m("k", 1);
+    m.mode = neural::Model::DELTA;
+    m.layer("out", 1, 0, 8, 0);
+    m.layers[0].w = {0.0};
+    m.layers[0].b = {0.0};
+    m.observe({20.0});
+    m.infer(false);
+    const double z0 = m.z[0][0], a0 = m.a[0][0];
+    bool threw = false;
+    try { m.change("out", 0, 0, 5.0e7); m.infer(false); }
+    catch (const std::runtime_error&) { threw = true; }
+    if (!threw) return fail(24, "case K did not reject");
+    if (bits_differ(m.z[0][0], z0) || bits_differ(m.a[0][0], a0))
+      return fail(25, "case K published a partial activation");
+  }
   std::cout << "P0_NUMERIC_PASS\n";
   return 0;
 }

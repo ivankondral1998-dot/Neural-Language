@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <filesystem>
 #include <iomanip>
@@ -133,12 +133,25 @@ public:
   }
   size_t weight_count()const {size_t n=0;for(auto& l:layers)n+=l.weight_count();return n;}
   size_t full_cost()const {return weight_count();}
-  // The incremental path recomputes the edited layer and every dependent layer.
-  // Cost follows that suffix. Adding a difference onto cached z is not used:
-  // it diverges from this reduction when large terms cancel.
+  bool layer_uses_blas(const Layer& l)const {
+    return has_blas && l.storage==0 && l.disabled==0 && l.w.size()>=256;
+  }
+  static bool same_bits(double x,double y) {
+    return std::memcmp(&x,&y,sizeof(double))==0;
+  }
+  // Upper bound on a selective pass: touched rows of the edited layer, then
+  // the whole downstream matrix. One changed activation reaches every dense
+  // output row, and each of those rows is summed in full. Disabled edges can
+  // only make the real pass cheaper. A BLAS layer cannot be split by rows.
   double predicted_delta_cost(int l)const {
+    const Layer& edited=layers[static_cast<size_t>(l)];
     double cost=0;
-    for(size_t k=static_cast<size_t>(l);k<layers.size();k++)
+    if(layer_uses_blas(edited)) cost+=double(edited.weight_count());
+    else {
+      const double rows=std::min(double(pending.size()),double(edited.out));
+      cost+=rows*double(edited.in)+rows;
+    }
+    for(size_t k=static_cast<size_t>(l)+1;k<layers.size();k++)
       cost+=double(layers[k].weight_count())+double(layers[k].out);
     return cost;
   }
@@ -152,13 +165,79 @@ public:
     const double full=double(full_cost())*(has_blas?0.35:0.85)+256.0*layers.size();
     return predicted_delta_cost(pending_layer) < full*0.85;
   }
+  // Exact selective reduction. A touched row uses the same left-to-right FP64
+  // sum as scalar FULL, from stored effective weights. Downstream rows run
+  // only when an enabled edge comes from a neuron whose activation bits
+  // changed. Adding a difference onto cached z is not used. The new buffers
+  // replace the cache only after every finite check. A BLAS layer is rebuilt
+  // with the same GEMV as FULL; a partial BLAS sum is not claimed.
+  void recompute_touched() {
+    const size_t edited=static_cast<size_t>(pending_layer);
+    require(cache && edited<layers.size(),"selective recompute requires a cached layer");
+    std::vector<std::vector<double>> nz=z,na=a;
+    std::vector<char> changed;
+    auto write_row=[&](size_t k,int r,const std::vector<double>& prev) {
+      const Layer& l=layers[k];
+      double total=l.b[r];
+      const size_t base=static_cast<size_t>(r)*static_cast<size_t>(l.in);
+      for(int c=0;c<l.in;c++) total+=l.effective(base+static_cast<size_t>(c))*prev[static_cast<size_t>(c)];
+      finite(total,"forward activation");
+      const double activation=act(total,l.type);
+      if(!same_bits(activation,a[k][static_cast<size_t>(r)])) changed[static_cast<size_t>(r)]=1;
+      nz[k][static_cast<size_t>(r)]=total;
+      na[k][static_cast<size_t>(r)]=activation;
+    };
+    auto refresh=[&](size_t k,const std::vector<char>& rows,const std::vector<double>& prev) {
+      const Layer& l=layers[k];
+      require(static_cast<int>(prev.size())==l.in,"selective input shape");
+      require(nz[k].size()==static_cast<size_t>(l.out) && na[k].size()==static_cast<size_t>(l.out),"cached activation shape");
+      changed.assign(static_cast<size_t>(l.out),0);
+      if(layer_uses_blas(l)) {
+        std::vector<double> tz(static_cast<size_t>(l.out),0.0),ta(static_cast<size_t>(l.out),0.0);
+        blas_gemv(l.out,l.in,l.w.data(),prev.data(),tz.data());
+        for(int r=0;r<l.out;r++) {
+          tz[static_cast<size_t>(r)]+=l.b[r];
+          finite(tz[static_cast<size_t>(r)],"forward activation");
+          ta[static_cast<size_t>(r)]=act(tz[static_cast<size_t>(r)],l.type);
+          if(!same_bits(ta[static_cast<size_t>(r)],a[k][static_cast<size_t>(r)])) changed[static_cast<size_t>(r)]=1;
+        }
+        nz[k].swap(tz);na[k].swap(ta);counters.blas_layers++;
+        return;
+      }
+      for(int r=0;r<l.out;r++) if(rows[static_cast<size_t>(r)]) write_row(k,r,prev);
+    };
+    std::vector<char> rows(static_cast<size_t>(layers[edited].out),0);
+    for(const auto& item:pending) {
+      require(item.row>=0 && item.row<layers[edited].out,"pending row invalid");
+      rows[static_cast<size_t>(item.row)]=1;
+    }
+    const std::vector<double>& first_prev=edited==0?input:a[edited-1];
+    refresh(edited,rows,first_prev);
+    for(size_t k=edited+1;k<layers.size();k++) {
+      bool any=false;
+      for(char bit:changed) if(bit) {any=true;break;}
+      if(!any) break;
+      const Layer& l=layers[k];
+      require(changed.size()==static_cast<size_t>(l.in),"selective fanout shape");
+      std::vector<char> next_rows(static_cast<size_t>(l.out),0);
+      if(layer_uses_blas(l)) std::fill(next_rows.begin(),next_rows.end(),1);
+      else {
+        for(int r=0;r<l.out;r++) {
+          const size_t base=static_cast<size_t>(r)*static_cast<size_t>(l.in);
+          for(int c=0;c<l.in;c++) if(changed[static_cast<size_t>(c)] && l.enabled[base+static_cast<size_t>(c)]) {
+            next_rows[static_cast<size_t>(r)]=1;break;
+          }
+        }
+      }
+      refresh(k,next_rows,na[k-1]);
+    }
+    z.swap(nz);a.swap(na);
+  }
   void flush_pending() {
     if(pending.empty())return;
     if(!choose_delta()){if(mode==AUTO)counters.auto_full++;forward();return;}
     require(pending_layer>=0&&static_cast<size_t>(pending_layer)<layers.size(),"pending layer invalid");
-    // Same reduction as forward(), from the edited layer downward. Stored
-    // effective weights are the source of truth, including INT8 rounding.
-    compute_from(static_cast<size_t>(pending_layer));
+    recompute_touched();
     cache=true;cache_version=version;pending.clear();pending_layer=-1;
     delta_streak++;counters.delta++;if(mode==AUTO)counters.auto_delta++;
   }
