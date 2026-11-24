@@ -1,3 +1,7 @@
+> **Правовой статус / Rights notice (2026-11-24).** Публичный доступ к исходникам не является открытой лицензией. Права на собственные охраняемые материалы сохранены за соответствующим правообладателем: [LICENSE](LICENSE). Права по закону, правилам площадки и действующим сторонним лицензиям сохраняются. Изменение официального репозитория допускается только владельцем и явно уполномоченными им исполнителями; данное уведомление не заменяет технические настройки доступа. Использование GitHub допускается только в пределах применимых условий сервиса и торговых ограничений. Коммерческая разработка и выпуск не получают разрешения самим фактом публичности.
+>
+> Public visibility is not an open-source license. See [LICENSE](LICENSE). Statutory, platform and existing third-party license rights are preserved. Official repository changes require owner authorization. This notice does not configure access controls or authorize use contrary to applicable hosting terms.
+
 # Neural Language
 
 > **Перед разработкой прочитать [NEURAL_LANGUAGE_PRODUCT_CHARTER.md](NEURAL_LANGUAGE_PRODUCT_CHARTER.md) и [AGENTS.md](AGENTS.md).** Утверждённая цель — полноценный специализированный язык .nir с проверяемыми преимуществами на телефонах. Отдельные помощники, компактные модели и JNI — необязательная инфраструктура или исследовательские компоненты; они не заменяют продукт. Пока мобильное превосходство не доказано.
